@@ -1,25 +1,35 @@
-import logo from './logo.svg';
+import React, { useState } from 'react';
+import ClientesPage from './pages/ClientesPage';
+import CobrancasPage from './pages/CobrancasPage';
 import './App.css';
 
 function App() {
+  const [view, setView] = useState('cobrancas'); // 'cobrancas' ou 'clientes'
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
+      <nav className="main-nav">
+        <button
+          onClick={() => setView('cobrancas')}
+          className={view === 'cobrancas' ? 'active' : ''}
         >
-          Learn React
-        </a>
-      </header>
+          Gerenciar Cobranças
+        </button>
+        <button
+          onClick={() => setView('clientes')}
+          className={view === 'clientes' ? 'active' : ''}
+        >
+          Gerenciar Clientes
+        </button>
+      </nav>
+      <main>
+        {view === 'cobrancas' ? <CobrancasPage /> : <ClientesPage />}
+      </main>
     </div>
   );
 }
 
 export default App;
+
+
+
