@@ -1,11 +1,10 @@
 import React from 'react';
 
-const CobrancaList = ({ cobrancas, clientes, onEdit, onDelete }) => {
+const CobrancaList = ({ cobrancas, clientes, onEdit, onDelete, selectedCobrancas, onSelectCobranca }) => {
     const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
     const formatDate = (dateString) => new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR');
 
     const getClienteName = (clienteId) => {
-        // Compara os IDs como números para evitar problemas de tipo (string vs number)
         const cliente = clientes.find(c => Number(c.id) === Number(clienteId));
         return cliente ? cliente.nome : 'Cliente Desconhecido';
     };
@@ -14,6 +13,7 @@ const CobrancaList = ({ cobrancas, clientes, onEdit, onDelete }) => {
         <table className="cobrancas-table">
             <thead>
                 <tr>
+                    <th>Sel.</th> {/* <-- NOVA COLUNA */}
                     <th>Cliente</th>
                     <th>Descrição</th>
                     <th>Valor</th>
@@ -24,10 +24,17 @@ const CobrancaList = ({ cobrancas, clientes, onEdit, onDelete }) => {
             </thead>
             <tbody>
                 {cobrancas.length === 0 ? (
-                    <tr><td colSpan="6" style={{ textAlign: 'center' }}>Nenhuma cobrança encontrada.</td></tr>
+                    <tr><td colSpan="7" style={{ textAlign: 'center' }}>Nenhuma cobrança encontrada.</td></tr>
                 ) : (
                     cobrancas.map(cobranca => (
-                        <tr key={cobranca.id}>
+                        <tr key={cobranca.id} className={selectedCobrancas.has(cobranca.id) ? 'row-selected' : ''}>
+                            <td> {/* <-- NOVA CÉLULA */}
+                                <input
+                                    type="checkbox"
+                                    checked={selectedCobrancas.has(cobranca.id)}
+                                    onChange={() => onSelectCobranca(cobranca.id)}
+                                />
+                            </td>
                             <td>{getClienteName(cobranca.clienteId)}</td>
                             <td>{cobranca.descricao}</td>
                             <td>{formatCurrency(cobranca.valor)}</td>

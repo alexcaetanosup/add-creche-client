@@ -211,3 +211,8 @@ button {
   background-color: #3498db;
   color: white;
 }
+
+.row-selected {
+    background-color: #e8f4fd !important; /* Cor de fundo azul claro */
+    font-weight: bold;
+}

@@ -1,0 +1,20 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/cobrancas",
+      "destination": "/api/db?entity=cobrancas"
+    },
+    {
+      "source": "/api/cobrancas/:id",
+      "destination": "/api/db?entity=cobrancas&id=:id"
+    },
+    {
+      "source": "/api/clientes",
+      "destination": "/api/db?entity=clientes"
+    },
+    {
+      "source": "/api/clientes/:id",
+      "destination": "/api/db?entity=clientes&id=:id"
+    }
+  ]
+}

@@ -1,4 +1,9 @@
 {
+  "config": {
+    "id": 1,
+    "ultimoNsaSequencial": 754,
+    "parteFixaNsa": "04"
+  },
   "clientes": [
     {
       "id": 1,

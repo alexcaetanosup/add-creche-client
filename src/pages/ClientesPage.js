@@ -4,6 +4,8 @@ import ClienteForm from '../components/ClienteForm';
 
 const API_URL = 'http://localhost:3001/clientes';
 
+// const API_URL = '/api/clientes'; // Usando proxy configurado no package.json
+
 const ClientesPage = () => {
     const [clientes, setClientes] = useState([]);
     const [clienteAtual, setClienteAtual] = useState(null);

@@ -1,350 +1,478 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import CobrancaList from '../components/cobrancalist/CobrancaList';
-import CobrancaForm from '../components/cobrancaform/CobrancaForm';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import React, { useState, useEffect, useCallback } from "react";
+import CobrancaList from "../components/cobrancalist/CobrancaList";
+import CobrancaForm from "../components/cobrancaform/CobrancaForm";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
-const API_COBRANCAS_URL = 'http://localhost:3001/cobrancas';
-const API_CLIENTES_URL = 'http://localhost:3001/clientes';
+const API_COBRANCAS_URL = "http://localhost:3001/cobrancas";
+const API_CLIENTES_URL = "http://localhost:3001/clientes";
+const API_CONFIG_URL = "http://localhost:3001/config";
+// const API_COBRANCAS_URL = '/api/cobrancas';
+// const API_CLIENTES_URL = '/api/clienjtes';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+// const API_CLIENTES_URL = `${API_BASE_URL}/api/clientes`;
+// const API_COBRANCAS_URL = `${API_BASE_URL}/api/cobrancas`;
+// const API_CONFIG_URL = `${API_BASE_URL}/api/config`;
 
 const CobrancasPage = () => {
-    const [cobrancas, setCobrancas] = useState([]);
-    const [clientes, setClientes] = useState([]);
-    const [cobrancaAtual, setCobrancaAtual] = useState(null);
-    const [filtro, setFiltro] = useState('');
-    const [isFormVisible, setIsFormVisible] = useState(false);
+  const [cobrancas, setCobrancas] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [config, setConfig] = useState(null); // <-- NOVO ESTADO PARA A CONFIG
+  const [cobrancaAtual, setCobrancaAtual] = useState(null);
+  const [filtro, setFiltro] = useState("");
+  const [isFormVisible, setIsFormVisible] = useState(false);
+  const [selectedCobrancas, setSelectedCobrancas] = useState(new Set()); // <-- NOVO ESTADO
 
-    const fetchData = useCallback(async () => {
-        try {
-            const [cobrancasRes, clientesRes] = await Promise.all([
-                fetch(API_COBRANCAS_URL),
-                fetch(API_CLIENTES_URL)
-            ]);
-            const cobrancasData = await cobrancasRes.json();
-            const clientesData = await clientesRes.json();
-            setCobrancas(cobrancasData);
-            setClientes(clientesData);
-        } catch (error) {
-            console.error("Erro ao buscar dados:", error);
-        }
-    }, []);
+  const fetchData = useCallback(async () => {
+    try {
+      const [cobrancasRes, clientesRes, configRes] = await Promise.all([
+        fetch(API_COBRANCAS_URL),
+        fetch(API_CLIENTES_URL),
+        fetch(API_CONFIG_URL), // <-- BUSCA A CONFIGURAÇÃO
+      ]);
+      const cobrancasData = await cobrancasRes.json();
+      const clientesData = await clientesRes.json();
+      const configData = await configRes.json(); // <-- ARMAZENA A CONFIGURAÇÃO
+      setCobrancas(cobrancasData);
+      setClientes(clientesData);
+      if (configData && configData.length > 0) {
+        setConfig(configData[0]);
+      }
+    } catch (error) {
+      console.error("Erro ao buscar dados:", error);
+    }
+  }, []);
 
-    useEffect(() => {
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Em src/pages/CobrancasPage.js
+
+  const handleSave = async (cobranca) => {
+    // 1. Validação de Entrada: Se por algum motivo chegou uma cobrança sem clienteId, pare aqui.
+    if (!cobranca.clienteId || cobranca.clienteId === "") {
+      console.error(
+        "Tentativa de salvar cobrança sem clienteId. Operação cancelada.",
+        cobranca
+      );
+      alert(
+        "ERRO: A cobrança não pode ser salva sem um cliente. Por favor, tente novamente."
+      );
+      return; // Interrompe a execução da função
+    }
+
+    const method = cobranca.id ? "PUT" : "POST";
+    const url = cobranca.id
+      ? `${API_COBRANCAS_URL}/${cobranca.id}`
+      : API_COBRANCAS_URL;
+
+    // 2. Preparação do Payload: Garante que os tipos estão corretos
+    const payload = {
+      ...cobranca,
+      clienteId: Number(cobranca.clienteId), // Converte para Número
+      valor: Number(cobranca.valor), // Converte para Número
+    };
+
+    // Se for um novo registro, o 'id' pode ser undefined ou null. O json-server cria o id.
+    // Se for uma edição, o 'id' já existe no payload.
+    // if (!payload.id) {
+    //     delete payload.id;
+    // }
+
+    if (!cobranca.id) {
+      // Se for um novo registro, define o status da remessa como pendente
+      payload.statusRemessa = "pendente";
+      delete payload.id;
+    }
+
+    // 3. Log para Depuração: Vamos ver exatamente o que está sendo enviado
+    console.log("Enviando para a API:", { url, method, payload });
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        console.log("Salvo com sucesso!");
         fetchData();
-    }, [fetchData]);
+        setIsFormVisible(false);
+        setCobrancaAtual(null);
+      } else {
+        const errorText = await response.text();
+        console.error(
+          "Erro ao salvar cobrança. Status:",
+          response.status,
+          "Resposta do servidor:",
+          errorText
+        );
+        alert("Ocorreu um erro no servidor ao salvar a cobrança.");
+      }
+    } catch (error) {
+      console.error("Erro de rede ao salvar cobrança:", error);
+      alert("Não foi possível conectar ao servidor para salvar a cobrança.");
+    }
+  };
 
-    // Em src/pages/CobrancasPage.js
+  const handleDelete = async (id) => {
+    if (window.confirm("Tem certeza que deseja deletar esta cobrança?")) {
+      try {
+        await fetch(`${API_COBRANCAS_URL}/${id}`, { method: "DELETE" });
+        fetchData();
+      } catch (error) {
+        console.error("Erro ao deletar cobrança:", error);
+      }
+    }
+  };
 
-    const handleSave = async (cobranca) => {
-        // 1. Validação de Entrada: Se por algum motivo chegou uma cobrança sem clienteId, pare aqui.
-        if (!cobranca.clienteId || cobranca.clienteId === '') {
-            console.error("Tentativa de salvar cobrança sem clienteId. Operação cancelada.", cobranca);
-            alert("ERRO: A cobrança não pode ser salva sem um cliente. Por favor, tente novamente.");
-            return; // Interrompe a execução da função
+  const handleEdit = (cobranca) => {
+    setCobrancaAtual(cobranca);
+    setIsFormVisible(true);
+  };
+
+  // Em src/pages/CobrancasPage.js
+
+  const handleFinalizarRemessa = async () => {
+    // A função getCobrancasParaProcessar() não existe no código fornecido,
+    // então vamos usar cobrancasFiltradas que já contém as cobranças pendentes.
+    const cobrancasParaFinalizar = cobrancasFiltradas;
+
+    if (cobrancasParaFinalizar.length === 0) {
+      alert("Não há cobranças pendentes para finalizar.");
+      return;
+    }
+
+    // Determina o nome do arquivo do mês anterior
+    const hoje = new Date();
+    const mesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
+    const ano = mesAnterior.getFullYear();
+    const mes = String(mesAnterior.getMonth() + 1).padStart(2, '0');
+    const nomeArquivo = `${ano}_${mes}`;
+
+    const confirmacao = window.confirm(
+      `Você confirma o arquivamento de ${cobrancasParaFinalizar.length} cobrança(s)?\n\n` +
+      `Elas serão movidas do banco de dados principal para um arquivo de histórico chamado "remessa_${nomeArquivo}.json" e não poderão ser editadas por esta interface.`
+    );
+
+    if (confirmacao) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/arquivar-remessa`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cobrancasParaArquivar: cobrancasParaFinalizar,
+            mesAno: nomeArquivo
+          }),
+        });
+
+        if (!response.ok) {
+          // Se a resposta não for OK, lança um erro com a mensagem do servidor
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Falha ao arquivar a remessa.');
         }
 
-        const method = cobranca.id ? 'PUT' : 'POST';
-        const url = cobranca.id ? `${API_COBRANCAS_URL}/${cobranca.id}` : API_COBRANCAS_URL;
+        alert("Remessa finalizada e arquivada com sucesso!");
+        fetchData(); // Recarrega os dados para atualizar a tela, que agora estará vazia.
 
-        // 2. Preparação do Payload: Garante que os tipos estão corretos
-        const payload = {
-            ...cobranca,
-            clienteId: Number(cobranca.clienteId), // Converte para Número
-            valor: Number(cobranca.valor)          // Converte para Número
-        };
+      } catch (error) {
+        console.error("Erro ao finalizar e arquivar remessa:", error);
+        alert(`Ocorreu um erro: ${error.message}`);
+      }
+    }
+  };
 
-        // Se for um novo registro, o 'id' pode ser undefined ou null. O json-server cria o id.
-        // Se for uma edição, o 'id' já existe no payload.
-        // if (!payload.id) {
-        //     delete payload.id;
-        // }
+  const handleSelectCobranca = (cobrancaId) => {
+    setSelectedCobrancas((prevSelected) => {
+      const newSelected = new Set(prevSelected);
+      if (newSelected.has(cobrancaId)) {
+        newSelected.delete(cobrancaId); // Desmarca se já estiver marcado
+      } else {
+        newSelected.add(cobrancaId); // Marca se não estiver marcado
+      }
+      return newSelected;
+    });
+  };
 
-        if (!cobranca.id) {
-            // Se for um novo registro, define o status da remessa como pendente
-            payload.statusRemessa = 'pendente';
-            delete payload.id;
-        }
+  // Dentro de src/pages/CobrancasPage.js
 
-        // 3. Log para Depuração: Vamos ver exatamente o que está sendo enviado
-        console.log("Enviando para a API:", { url, method, payload });
+  const cobrancasFiltradas = cobrancas.filter((c) => {
+    // Encontra o cliente correspondente
+    const cliente = clientes.find(
+      (cli) => Number(cli.id) === Number(c.clienteId)
+    );
 
-        try {
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+    // CONDIÇÃO NOVA: A cobrança deve ser pendente de remessa
+    const remessaPendente = c.statusRemessa === "pendente";
 
-            if (response.ok) {
-                console.log("Salvo com sucesso!");
-                fetchData();
-                setIsFormVisible(false);
-                setCobrancaAtual(null);
-            } else {
-                const errorText = await response.text();
-                console.error("Erro ao salvar cobrança. Status:", response.status, "Resposta do servidor:", errorText);
-                alert("Ocorreu um erro no servidor ao salvar a cobrança.");
-            }
-        } catch (error) {
-            console.error("Erro de rede ao salvar cobrança:", error);
-            alert("Não foi possível conectar ao servidor para salvar a cobrança.");
-        }
-    };
+    // Se o campo de filtro estiver vazio, mostra a cobrança se for pendente
+    if (filtro.trim() === "") {
+      return cliente && remessaPendente;
+    }
 
-    const handleDelete = async (id) => {
-        if (window.confirm('Tem certeza que deseja deletar esta cobrança?')) {
-            try {
-                await fetch(`${API_COBRANCAS_URL}/${id}`, { method: 'DELETE' });
-                fetchData();
-            } catch (error) {
-                console.error("Erro ao deletar cobrança:", error);
-            }
-        }
-    };
+    // Se o filtro não estiver vazio, verifica o nome do cliente E se a remessa é pendente
+    return (
+      cliente &&
+      cliente.nome.toLowerCase().includes(filtro.toLowerCase()) &&
+      remessaPendente
+    );
+  });
 
-    const handleEdit = (cobranca) => {
-        setCobrancaAtual(cobranca);
-        setIsFormVisible(true);
-    };
+  // Sua função gerarPDF e gerarTXT podem ser copiadas para cá, com uma pequena modificação
+  // Dentro de src/pages/CobrancasPage.js
 
-    const handleFinalizarRemessa = async () => {
-        if (cobrancasFiltradas.length === 0) {
-            alert("Não há cobranças pendentes para finalizar.");
-            return;
-        }
+  // Dentro de src/pages/CobrancasPage.js
 
-        if (window.confirm(`Você confirma a finalização de ${cobrancasFiltradas.length} cobrança(s)? Elas não aparecerão mais na lista de remessas pendentes.`)) {
-            // Cria um array de promessas, uma para cada requisição de atualização
-            const updatePromises = cobrancasFiltradas.map(cobranca => {
-                const updatedCobranca = { ...cobranca, statusRemessa: 'gerada' };
-                return fetch(`${API_COBRANCAS_URL}/${cobranca.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(updatedCobranca),
-                });
-            });
+  const gerarPDF = () => {
+    const cobrancasParaGerar = getCobrancasParaProcessar();
 
-            try {
-                // Espera todas as atualizações terminarem
-                await Promise.all(updatePromises);
-                alert("Remessa finalizada com sucesso! A lista foi limpa.");
-                fetchData(); // Recarrega os dados para atualizar a tela
-            } catch (error) {
-                console.error("Erro ao finalizar remessa:", error);
-                alert("Ocorreu um erro ao finalizar a remessa. Verifique o console.");
-            }
-        }
-    };
+    if (cobrancasParaGerar.length === 0) {
+      alert("Não há cobranças selecionadas ou pendentes para gerar o PDF.");
+      return;
+    }
 
-    // Dentro de src/pages/CobrancasPage.js
+    const doc = new jsPDF();
 
-    const cobrancasFiltradas = cobrancas.filter(c => {
-        // Encontra o cliente correspondente
-        const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
+    // 1. Título do Relatório
+    doc.setFontSize(18);
+    doc.text("Relatório de Cobranças", 14, 22);
 
-        // CONDIÇÃO NOVA: A cobrança deve ser pendente de remessa
-        const remessaPendente = c.statusRemessa === 'pendente';
+    // 2. Preparar dados para a tabela
+    const tableColumn = ["Cliente", "Descrição", "Valor", "Vencimento", "Status"];
+    const tableRows = [];
 
-        // Se o campo de filtro estiver vazio, mostra a cobrança se for pendente
-        if (filtro.trim() === '') {
-            return cliente && remessaPendente;
-        }
-
-        // Se o filtro não estiver vazio, verifica o nome do cliente E se a remessa é pendente
-        return cliente && cliente.nome.toLowerCase().includes(filtro.toLowerCase()) && remessaPendente;
+    cobrancasParaGerar.forEach(cobranca => {
+      const cliente = clientes.find(cli => Number(cli.id) === Number(cobranca.clienteId));
+      const cobrancaData = [
+        cliente ? cliente.nome : 'N/A',
+        cobranca.descricao,
+        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cobranca.valor),
+        new Date(cobranca.vencimento + 'T00:00:00').toLocaleDateString('pt-BR'),
+        cobranca.status
+      ];
+      tableRows.push(cobrancaData);
     });
 
+    // 3. Desenhar a tabela com ESTILOS DE COLUNA
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 30,
+      // --- A MÁGICA ACONTECE AQUI ---
+      columnStyles: {
+        2: { halign: 'right' } // A coluna 'Valor' é a de índice 2 (0: Cliente, 1: Descrição, 2: Valor)
+      }
+    });
 
-    // Sua função gerarPDF e gerarTXT podem ser copiadas para cá, com uma pequena modificação
-    const gerarPDF = () => {
-        const doc = new jsPDF();
-        doc.text("Relatório de Cobranças", 14, 16);
-        autoTable(doc, {
-            head: [['Cliente', 'Descrição', 'Valor', 'Vencimento', 'Status']],
-            body: cobrancasFiltradas.map(c => {
-                // const cliente = clientes.find(cli => cli.id === c.clienteId);
-                const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
-                return [
-                    cliente ? cliente.nome : 'N/A',
-                    c.descricao,
-                    `R$ ${c.valor.toFixed(2)}`,
-                    new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR'),
-                    c.status
-                ]
-            }),
-            startY: 20,
-        });
-        doc.save('relatorio_cobrancas.pdf');
-    };
+    // 4. Adicionar os Totais
+    const totalCobrancas = cobrancasParaGerar.length;
+    const valorTotal = cobrancasParaGerar.reduce((sum, c) => sum + c.valor, 0);
+    const valorTotalFormatado = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorTotal);
 
-    // Copie sua função gerarTXT para cá também, fazendo a mesma adaptação para buscar o nome do cliente.
+    const finalY = doc.lastAutoTable.finalY;
 
-    // Dentro de src/pages/CobrancasPage.js
+    doc.setFontSize(10);
+    // Para alinhar o valor total à direita, precisamos saber a largura da página
+    const pageWidth = doc.internal.pageSize.getWidth();
 
-    const gerarTXT = async () => {
-        // --- FUNÇÕES AUXILIARES DE FORMATAÇÃO ---
-        const formatText = (text = '', length) => String(text).substring(0, length).padEnd(length, ' ');
-        const formatNumber = (num = 0, length) => String(num).replace(/[^0-9]/g, '').padStart(length, '0');
+    doc.text(`Total de Cobranças: ${totalCobrancas}`, 14, finalY + 10);
+    // Usamos a opção de alinhamento do doc.text para o valor total
+    doc.text(`Valor Total: ${valorTotalFormatado}`, pageWidth - 14, finalY + 10, { align: 'right' });
 
-        // --- DEFINIÇÃO PRECISA E FINAL DO LAYOUT (150 caracteres) ---
-        const layout = {
-            header: {
-                TIPO_REGISTRO: 1, COD_SERVICO: 1, CONVENIO: 20, NOME_EMPRESA: 20,
-                COD_BANCO: 3, NOME_BANCO: 20, DATA_GERACAO: 8, NSA: 8,
-                VERSAO_LAYOUT: 40, ID_SISTEMA: 29
-            },
-            detail: {
-                TIPO_REGISTRO: 1, CODIGO_CLIENTE: 25, DADOS_BANCARIOS: 18,
-                DATA_VENCIMENTO: 8, VALOR_DEBITO: 15, COD_MOEDA: 2,
-                BRANCOS: 79, COD_OCORRENCIA: 1
-            },
-            trailer: {
-                TIPO_REGISTRO: 1, TOTAL_REGISTROS: 6, SOMA_VALORES: 18, BRANCOS: 125
-            }
-        };
 
-        try {
-            // --- DADOS FIXOS DA EMPRESA E ARQUIVO ---
-            const empresa = {
-                codigoConvenio: '00330043002501218126',
-                nome: 'CRECHE BERCARIO NANA',
-                banco: '033',
-                nomeBanco: 'BANCO SANTANDER',
-            };
-            const nsa = '00077504';
-            const idSistema = 'G4DB160609';
+    // 5. Salvar o arquivo
+    doc.save('relatorio_cobrancas.pdf');
+  };
 
-            // --- FUNÇÃO PARA MONTAR UMA LINHA COM PRECISÃO ---
-            const buildLine = (type, data) => {
-                let line = '';
-                for (const field in layout[type]) {
-                    const size = layout[type][field];
-                    const value = data[field] || '';
+  // Dentro do componente CobrancasPage, antes da função gerarTXT
 
-                    // Regra de formatação corrigida e específica
-                    if (['CODIGO_CLIENTE', 'DADOS_BANCARIOS'].includes(field)) {
-                        // Estes campos são sempre texto, mesmo que contenham números
-                        line += formatText(value, size);
-                    } else if (typeof value === 'number' || !isNaN(value) && String(value).trim() !== '') {
-                        // Formata como número se for um número ou uma string numérica
-                        line += formatNumber(value, size);
-                    } else {
-                        // Formata como texto para todos os outros casos (ex: nome, brancos)
-                        line += formatText(value, size);
-                    }
-                }
-                return line;
-            };
+  const getCobrancasParaProcessar = () => {
+    if (selectedCobrancas.size > 0) {
+      // Se há itens selecionados, filtra a lista original de cobranças
+      // Isso garante que peguemos todas as cobranças selecionadas, mesmo que não correspondam ao filtro de texto atual
+      return cobrancas.filter(c => selectedCobrancas.has(c.id));
+    }
+    // Senão, usa a lista já filtrada da tela
+    return cobrancasFiltradas;
+  };
 
-            // --- PREPARAR DADOS E MONTAR LINHAS ---
-            const dataGeracao = new Date();
-            const dataGeracaoFormatada = formatNumber(dataGeracao.getFullYear(), 4) +
-                formatNumber(dataGeracao.getMonth() + 1, 2) +
-                formatNumber(dataGeracao.getDate(), 2);
+  // Dentro de src/pages/CobrancasPage.js
 
-            // Header
-            const headerData = {
-                TIPO_REGISTRO: 'A', COD_SERVICO: '1', CONVENIO: empresa.codigoConvenio, NOME_EMPRESA: empresa.nome,
-                COD_BANCO: empresa.banco, NOME_BANCO: empresa.nomeBanco, DATA_GERACAO: dataGeracaoFormatada, NSA: nsa,
-                VERSAO_LAYOUT: 'DEBITO AUTOMATICO', ID_SISTEMA: idSistema
-            };
-            const headerLine = buildLine('header', headerData);
+  const gerarTXT = async () => {
+    const cobrancasParaGerar = getCobrancasParaProcessar();
 
-            // Details
-            let detailLines = [];
-            let totalValorCobrado = 0;
+    // --- VALIDAÇÃO INICIAL ---
+    if (cobrancasParaGerar.length === 0) {
+      alert("Não há cobranças selecionadas ou pendentes para gerar a remessa.");
+      return;
+    }
+    if (!config || typeof config.ultimoNsaSequencial === 'undefined') {
+      alert("Erro: Configurações do sistema (NSA) não carregadas. Tente recarregar a página.");
+      return;
+    }
 
-            cobrancasFiltradas.forEach((cobranca) => {
-                // const cliente = clientes.find(cli => cli.id === cobranca.clienteId);
-                const cliente = clientes.find(cli => Number(cli.id) === Number(cobranca.clienteId));
-                
-                if (!cliente) return;
-                totalValorCobrado += cobranca.valor;
+    // --- GERENCIAMENTO DO NSA ---
+    const novoNsaSequencial = config.ultimoNsaSequencial + 1;
+    const parteFixa = config.parteFixaNsa || '04';
+    const nsaCompleto = `${String(novoNsaSequencial).padStart(6, '0')}${parteFixa}`;
 
-                const detailData = {
-                    TIPO_REGISTRO: 'E',
-                    CODIGO_CLIENTE: cliente.codigo,
-                    DADOS_BANCARIOS: cliente.contaCorrente,
-                    DATA_VENCIMENTO: cobranca.vencimento.replace(/-/g, ''),
-                    VALOR_DEBITO: cobranca.valor * 100,
-                    COD_MOEDA: '3',
-                    BRANCOS: '',
-                    COD_OCORRENCIA: '0' // Código de ocorrência padrão
-                };
-                detailLines.push(buildLine('detail', detailData));
-            });
-
-            // Trailer
-            const totalRegistros = cobrancasFiltradas.length + 2; // Header + Details + Trailer
-
-            const trailerData = {
-                TIPO_REGISTRO: 'Z',
-                TOTAL_REGISTROS: totalRegistros,
-                SOMA_VALORES: totalValorCobrado * 100,
-                BRANCOS: ''
-            };
-            const trailerLine = buildLine('trailer', trailerData);
-
-            // --- JUNTAR TUDO E GERAR O ARQUIVO FINAL ---
-            const finalContent = [headerLine, ...detailLines, trailerLine].join('\n');
-
-            const blob = new Blob([finalContent], { type: 'text/plain;charset=latin1' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `DA${dataGeracaoFormatada}.txt`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-
-        } catch (error) {
-            console.error("Erro ao gerar arquivo de remessa:", error);
-            alert("Ocorreu um erro ao gerar o arquivo. Verifique o console.");
-        }
-    };
-
-    // ... (antes do return)
-
-    return (
-        <div>
-            <h1>Gerenciamento de Cobranças</h1>
-            <div className="action-bar">
-                <div className="search-bar">
-                    <input
-                        type="text"
-                        placeholder="Filtrar por nome do cliente..."
-                        value={filtro}
-                        onChange={(e) => setFiltro(e.target.value)}
-                    />
-                </div>
-                <div className="button-group">
-                    {!isFormVisible && (
-                        <button onClick={() => setIsFormVisible(true)} className="btn-primary">Nova Cobrança</button>
-                    )}
-                    <button onClick={gerarPDF} className="btn-secondary">Gerar PDF</button>
-                    {/* Coloque o botão de Gerar TXT aqui */}
-                    <button onClick={gerarTXT} className="btn-tertiary">Gerar TXT</button>
-                    <button onClick={handleFinalizarRemessa} className="btn-archive">Limpar Remessa</button>
-                </div>
-
-            </div>
-
-            {isFormVisible && (
-                <CobrancaForm
-                    onSave={handleSave}
-                    cobrancaAtual={cobrancaAtual}
-                    clientes={clientes} // Passa a lista de clientes para o formulário
-                    onCancel={() => { setIsFormVisible(false); setCobrancaAtual(null); }}
-                />
-            )}
-
-            <CobrancaList
-                cobrancas={cobrancasFiltradas}
-                clientes={clientes} // Passa a lista de clientes para a tabela
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-            />
-        </div>
+    const confirmacao = window.confirm(
+      `Gerar remessa para ${cobrancasParaGerar.length} cobrança(s).\n` +
+      `Remessa Anterior (NSA): ${config.ultimoNsaSequencial}\n` +
+      `Nova Remessa (NSA): ${novoNsaSequencial}\n\n` +
+      `Confirmar a geração do arquivo?`
     );
+
+    if (!confirmacao) return;
+
+    let finalContent = '';
+
+    try {
+      const formatText = (text = '', length) => String(text).substring(0, length).padEnd(length, ' ');
+      const formatNumber = (num = 0, length) => String(num).replace(/[^0-9]/g, '').padStart(length, '0');
+
+      const layout = {
+        header: { TIPO_REGISTRO: 1, COD_SERVICO: 1, CONVENIO: 20, NOME_EMPRESA: 20, COD_BANCO: 3, NOME_BANCO: 20, DATA_GERACAO: 8, NSA: 8, VERSAO_LAYOUT: 59, ID_SISTEMA: 29 },
+        detail: { TIPO_REGISTRO: 1, CODIGO_CLIENTE: 25, DADOS_BANCARIOS: 20, DATA_VENCIMENTO: 8, VALOR_DEBITO: 15, COD_MOEDA: 1, BRANCOS: 79, COD_OCORRENCIA: 1 },
+        trailer: { TIPO_REGISTRO: 1, TOTAL_REGISTROS: 6, SOMA_VALORES: 18, BRANCOS: 125 }
+      };
+
+      const empresa = { codigoConvenio: '00330043002501218126', nome: 'CRECHE BERCARIO NANA', banco: '033', nomeBanco: 'BANCO SANTANDER' };
+      const idSistema = 'G4DB160609';
+
+      const buildLine = (type, data) => {
+        let line = '';
+        for (const field in layout[type]) {
+          const size = layout[type][field];
+          const value = data[field] || '';
+          if (['CODIGO_CLIENTE', 'DADOS_BANCARIOS'].includes(field)) { line += formatText(value, size); }
+          else if (typeof value === 'number' || !isNaN(value) && String(value).trim() !== '') { line += formatNumber(value, size); }
+          else { line += formatText(value, size); }
+        }
+        return line;
+      };
+
+      const dataGeracao = new Date();
+      const dataGeracaoFormatada = formatNumber(dataGeracao.getFullYear(), 4) + formatNumber(dataGeracao.getMonth() + 1, 2) + formatNumber(dataGeracao.getDate(), 2);
+
+      const headerData = { TIPO_REGISTRO: 'A', COD_SERVICO: '1', CONVENIO: empresa.codigoConvenio, NOME_EMPRESA: empresa.nome, COD_BANCO: empresa.banco, NOME_BANCO: empresa.nomeBanco, DATA_GERACAO: dataGeracaoFormatada, NSA: nsaCompleto, VERSAO_LAYOUT: 'DEBITO AUTOMATICO', ID_SISTEMA: idSistema };
+      const headerLine = buildLine('header', headerData);
+
+      let detailLines = [];
+      let totalValorCobrado = 0;
+
+      cobrancasParaGerar.forEach((cobranca) => {
+        const cliente = clientes.find(cli => Number(cli.id) === Number(cobranca.clienteId));
+        if (!cliente) return;
+        totalValorCobrado += cobranca.valor;
+        const detailData = { TIPO_REGISTRO: 'E', CODIGO_CLIENTE: cliente.codigo, DADOS_BANCARIOS: cliente.contaCorrente, DATA_VENCIMENTO: cobranca.vencimento.replace(/-/g, ''), VALOR_DEBITO: cobranca.valor * 100, COD_MOEDA: '3', BRANCOS: '', COD_OCORRENCIA: '0' };
+        detailLines.push(buildLine('detail', detailData));
+      });
+
+      const totalRegistros = cobrancasParaGerar.length + 2;
+      const trailerData = { TIPO_REGISTRO: 'Z', TOTAL_REGISTROS: totalRegistros, SOMA_VALORES: totalValorCobrado * 100, BRANCOS: '' };
+      const trailerLine = buildLine('trailer', trailerData);
+
+      finalContent = [headerLine, ...detailLines, trailerLine].join('\n');
+
+      const blob = new Blob([finalContent], { type: 'text/plain;charset=latin1' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `REMESSA_NSA_${novoNsaSequencial}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      console.log("Arquivo TXT gerado e download iniciado.");
+
+    } catch (error) {
+      console.error("Erro CRÍTICO na montagem ou download do arquivo TXT:", error);
+      alert("Falha ao gerar o arquivo TXT. A operação foi cancelada e o NSA não será atualizado.");
+      return;
+    }
+
+    try {
+      const updatedConfigPayload = { ...config, ultimoNsaSequencial: novoNsaSequencial };
+      const configUpdateUrl = `${API_CONFIG_URL}/${config.id}`;
+
+      const updateResponse = await fetch(configUpdateUrl, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedConfigPayload) });
+
+      if (!updateResponse.ok) {
+        const errorBody = await updateResponse.text();
+        throw new Error(`Falha ao atualizar NSA. Servidor respondeu com status ${updateResponse.status}: ${errorBody}`);
+      }
+
+      console.log("NSA atualizado com sucesso no servidor.");
+      setConfig(updatedConfigPayload);
+      alert(`Arquivo de remessa com NSA ${novoNsaSequencial} gerado com sucesso! O NSA foi atualizado.`);
+
+    } catch (error) {
+      console.error("Erro ao ATUALIZAR o NSA no servidor:", error);
+      alert(`ERRO CRÍTICO: O arquivo TXT foi gerado, mas não foi possível salvar o novo NSA (${novoNsaSequencial}). Anote este número para evitar duplicidade!`);
+    }
+  };
+  // ... (antes do return)
+
+  return (
+
+    <div>
+      <h1>Gerenciamento de Cobranças</h1>
+      <div className="action-bar">
+        <div className="search-bar">
+          <input
+            type="text"
+            placeholder="Filtrar por nome do cliente..."
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value)}
+          />
+        </div>
+        <div className="button-group">
+          {!isFormVisible && (
+            <button
+              onClick={() => setIsFormVisible(true)}
+              className="btn-primary"
+            >
+              Nova Cobrança
+            </button>
+          )}
+          <button onClick={gerarPDF} className="btn-secondary">
+            Gerar PDF
+          </button>
+          {/* Coloque o botão de Gerar TXT aqui */}
+          <button onClick={gerarTXT} className="btn-tertiary">
+            Gerar TXT
+          </button>
+          <button onClick={handleFinalizarRemessa} className="btn-archive">
+            Limpar Remessa
+          </button>
+        </div>
+      </div>
+
+      {isFormVisible && (
+        <CobrancaForm
+          onSave={handleSave}
+          cobrancaAtual={cobrancaAtual}
+          clientes={clientes} // Passa a lista de clientes para o formulário
+          onCancel={() => {
+            setIsFormVisible(false);
+            setCobrancaAtual(null);
+          }}
+        />
+      )}
+
+      <CobrancaList
+        cobrancas={cobrancasFiltradas}
+        clientes={clientes}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        selectedCobrancas={selectedCobrancas} // <-- NOVA PROP
+        onSelectCobranca={handleSelectCobranca} // <-- NOVA PROP
+      />
+    </div>
+  );
 };
 
 export default CobrancasPage;
