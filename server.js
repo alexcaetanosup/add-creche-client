@@ -72,7 +72,3 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`Servidor rodando na porta ${PORT}`);
 });
-
-
-// Final de rota do servidor
-// Agora você pode acessar o servidor customizado e as rotas do json-server normalmente
