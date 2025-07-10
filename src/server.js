@@ -1,3 +1,5 @@
+// Server do App-Creche com json-server e rotas customizadas
+
 const jsonServer = require('json-server');
 const express = require('express');
 const path = require('path');
@@ -25,6 +27,12 @@ if (!fs.existsSync(dbPath)) {
         fs.writeFileSync(dbPath, JSON.stringify({ clientes: [], cobrancas: [], config: {} }));
     }
 }
+
+// ROTA DE TESTE PARA VERIFICAR SE O ROTEAMENTO CUSTOMIZADO ESTÁ FUNCIONANDO
+app.get('/api/healthcheck', (req, res) => {
+    console.log('Rota /api/healthcheck foi chamada!');
+    res.status(200).json({ status: 'ok', message: 'Servidor customizado está no ar!' });
+});
 
 // --- ROTA CUSTOMIZADA DE ARQUIVAMENTO --- (Adição 2)
 app.post('/api/arquivar-remessa', (req, res) => {

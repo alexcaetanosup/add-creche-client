@@ -136,6 +136,8 @@ const CobrancasPage = () => {
 
   // Em src/pages/CobrancasPage.js
 
+  // Em src/pages/CobrancasPage.js
+
   const handleFinalizarRemessa = async () => {
     // A função getCobrancasParaProcessar() não existe no código fornecido,
     // então vamos usar cobrancasFiltradas que já contém as cobranças pendentes.
@@ -180,7 +182,12 @@ const CobrancasPage = () => {
 
       } catch (error) {
         console.error("Erro ao finalizar e arquivar remessa:", error);
-        alert(`Ocorreu um erro: ${error.message}`);
+        // Verifica se o erro foi por causa de um JSON inválido
+        if (error instanceof SyntaxError) {
+          alert("Ocorreu um erro de comunicação com o servidor. A resposta não era um JSON válido.");
+        } else {
+          alert(`Ocorreu um erro: ${error.message}`);
+        }
       }
     }
   };
