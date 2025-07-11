@@ -1,5 +1,5 @@
 {
-  "name": "app-cobranca-final",
+  "name": "add-creche-client",
   "version": "1.0.0",
   "private": true,
   "dependencies": {
@@ -11,22 +11,13 @@
     "react-scripts": "5.0.1",
     "web-vitals": "^2.1.4",
     "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.2",
-    "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "json-server": "^1.0.0-beta.1"
+    "jspdf-autotable": "^3.8.2"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "start:server": "node server.js",
-    "dev": "concurrently \"nodemon server.js\" \"npm start\""
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.2",
-    "nodemon": "^3.1.4"
+    "eject": "react-scripts eject"
   },
   "engines": {
     "node": "18.x"
