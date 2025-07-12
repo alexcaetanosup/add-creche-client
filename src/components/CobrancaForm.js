@@ -52,44 +52,39 @@ const CobrancaForm = ({ onSave, cobrancaAtual, onCancel, clientes }) => {
         onSave(cobranca);
     };
 
+    // Em CobrancaForm.js
     return (
         <div className="form-container">
             <h2>{cobrancaAtual ? 'Editar Cobrança' : 'Adicionar Nova Cobrança'}</h2>
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                    <label>Cliente</label>
-                    {/* O atributo 'required' no select já ajuda, mas a validação no handleSubmit é mais segura */}
-                    <select name="clienteId" value={cobranca.clienteId} onChange={handleChange} required>
+                    <label htmlFor="clienteId">Cliente</label>
+                    <select id="clienteId" name="clienteId" value={cobranca.clienteId} onChange={handleChange} required>
                         <option value="" disabled>Selecione um cliente</option>
                         {clientes.filter(c => c.ativo).map(cliente => (
                             <option key={cliente.id} value={cliente.id}>{cliente.nome}</option>
                         ))}
                     </select>
                 </div>
-
                 <div className="form-group">
-                    <label>Descrição</label>
-                    <input type="text" name="descricao" value={cobranca.descricao} onChange={handleChange} required />
+                    <label htmlFor="descricao">Descrição</label>
+                    <input type="text" id="descricao" name="descricao" value={cobranca.descricao} onChange={handleChange} required />
                 </div>
-
                 <div className="form-group">
-                    <label>Valor (R$)</label>
-                    <input type="number" name="valor" step="0.01" value={cobranca.valor} onChange={handleChange} required />
+                    <label htmlFor="valor">Valor (R$)</label>
+                    <input type="number" id="valor" name="valor" step="0.01" value={cobranca.valor} onChange={handleChange} required />
                 </div>
-
                 <div className="form-group">
-                    <label>Data de Vencimento</label>
-                    <input type="date" name="vencimento" value={cobranca.vencimento} onChange={handleChange} required />
+                    <label htmlFor="vencimento">Data de Vencimento</label>
+                    <input type="date" id="vencimento" name="vencimento" value={cobranca.vencimento} onChange={handleChange} required />
                 </div>
-
                 <div className="form-group">
-                    <label>Status</label>
-                    <select name="status" value={cobranca.status} onChange={handleChange}>
+                    <label htmlFor="status">Status</label>
+                    <select id="status" name="status" value={cobranca.status} onChange={handleChange}>
                         <option value="Pendente">Pendente</option>
                         <option value="Pago">Pago</option>
                     </select>
                 </div>
-
                 <div className="form-actions">
                     <button type="submit" className="btn-primary">{cobrancaAtual ? 'Salvar Alterações' : 'Adicionar Cobrança'}</button>
                     <button type="button" className="btn-secondary" onClick={onCancel}>Cancelar</button>

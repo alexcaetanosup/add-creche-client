@@ -228,7 +228,14 @@ const CobrancasPage = () => {
       <h1>Gerenciamento de Cobranças</h1>
       <div className="action-bar">
         <div className="search-bar">
-          <input type="text" placeholder="Filtrar por nome do cliente..." value={filtro} onChange={(e) => setFiltro(e.target.value)} />
+          <input
+            type="text"
+            id="filtro-cobranca"
+            name="filtro-cobranca"
+            placeholder="Filtrar por nome do cliente..."
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value)}
+          />
         </div>
         <div className="button-group">
           {!isFormVisible && (

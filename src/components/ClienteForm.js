@@ -31,33 +31,34 @@ const ClienteForm = ({ onSave, clienteAtual, onCancel }) => {
         setCliente({ nome: '', documento: '', banco: '', contaCorrente: '', ativo: true });
     };
 
+    // Em ClienteForm.js
     return (
         <div className="form-container">
             <h2>{clienteAtual ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</h2>
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                    <label>Nome</label>
-                    <input type="text" name="nome" value={cliente.nome} onChange={handleChange} required />
+                    <label htmlFor="codigo">Código do Cliente (para remessa)</label>
+                    <input type="text" id="codigo" name="codigo" value={cliente.codigo || ''} onChange={handleChange} required />
                 </div>
                 <div className="form-group">
-                    <label>Código do Cliente (para remessa)</label>
-                    <input type="text" name="codigo" value={cliente.codigo || ''} onChange={handleChange} required />
+                    <label htmlFor="nome">Nome</label>
+                    <input type="text" id="nome" name="nome" value={cliente.nome} onChange={handleChange} required />
                 </div>
                 <div className="form-group">
-                    <label>Documento (CPF/CNPJ)</label>
-                    <input type="text" name="documento" value={cliente.documento} onChange={handleChange} required />
+                    <label htmlFor="documento">Documento (CPF/CNPJ)</label>
+                    <input type="text" id="documento" name="documento" value={cliente.documento} onChange={handleChange} required />
                 </div>
                 <div className="form-group">
-                    <label>Banco</label>
-                    <input type="text" name="banco" value={cliente.banco} onChange={handleChange} />
+                    <label htmlFor="banco">Banco</label>
+                    <input type="text" id="banco" name="banco" value={cliente.banco} onChange={handleChange} />
                 </div>
                 <div className="form-group">
-                    <label>Conta Corrente</label>
-                    <input type="text" name="contaCorrente" value={cliente.contaCorrente} onChange={handleChange} />
+                    <label htmlFor="contaCorrente">Conta Corrente</label>
+                    <input type="text" id="contaCorrente" name="contaCorrente" value={cliente.contaCorrente} onChange={handleChange} />
                 </div>
                 <div className="form-group">
-                    <label>Status</label>
-                    <select name="ativo" value={cliente.ativo} onChange={e => handleChange({ target: { name: 'ativo', value: e.target.value === 'true' } })}>
+                    <label htmlFor="ativo">Status</label>
+                    <select id="ativo" name="ativo" value={cliente.ativo} onChange={e => handleChange({ target: { name: 'ativo', value: e.target.value === 'true' } })}>
                         <option value={true}>Ativo</option>
                         <option value={false}>Inativo</option>
                     </select>
