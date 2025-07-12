@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import ClienteList from '../components/ClienteList';
 import ClienteForm from '../components/ClienteForm';
 
-const API_URL = 'http://localhost:3001/clientes';
-
-// const API_URL = '/api/clientes'; // Usando proxy configurado no package.json
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = `${API_BASE_URL}/api/clientes`;
 
 const ClientesPage = () => {
     const [clientes, setClientes] = useState([]);
