@@ -7,13 +7,8 @@ import autoTable from "jspdf-autotable";
 const API_COBRANCAS_URL = "http://localhost:3001/cobrancas";
 const API_CLIENTES_URL = "http://localhost:3001/clientes";
 const API_CONFIG_URL = "http://localhost:3001/config";
-// const API_COBRANCAS_URL = '/api/cobrancas';
-// const API_CLIENTES_URL = '/api/clienjtes';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-// const API_CLIENTES_URL = `${API_BASE_URL}/api/clientes`;
-// const API_COBRANCAS_URL = `${API_BASE_URL}/api/cobrancas`;
-// const API_CONFIG_URL = `${API_BASE_URL}/api/config`;
 
 const CobrancasPage = () => {
   const [cobrancas, setCobrancas] = useState([]);
