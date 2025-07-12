@@ -206,31 +206,30 @@ const CobrancasPage = () => {
 
   // Dentro de src/pages/CobrancasPage.js
 
-  const cobrancasFiltradas = cobrancas.filter((c) => {
-    // Encontra o cliente correspondente
-    const cliente = clientes.find(
-      (cli) => Number(cli.id) === Number(c.clienteId)
-    );
-
-    // CONDIÇÃO NOVA: A cobrança deve ser pendente de remessa
-    const remessaPendente = c.statusRemessa === "pendente";
-
-    // Se o campo de filtro estiver vazio, mostra a cobrança se for pendente
-    if (filtro.trim() === "") {
-      return cliente && remessaPendente;
+  const cobrancasFiltradas = cobrancas.filter(c => {
+    // Primeira condição: a cobrança DEVE ser pendente de remessa.
+    const remessaPendente = c.statusRemessa === 'pendente';
+    if (!remessaPendente) {
+      return false;
     }
 
-    // Se o filtro não estiver vazio, verifica o nome do cliente E se a remessa é pendente
-    return (
-      cliente &&
-      cliente.nome.toLowerCase().includes(filtro.toLowerCase()) &&
-      remessaPendente
-    );
+    // Segunda condição: a cobrança DEVE ter um cliente associado.
+    const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
+    if (!cliente) {
+      return false;
+    }
+
+    // Se passou pelas condições acima, agora aplicamos o filtro de texto.
+    // A cobrança será incluída se o filtro estiver vazio OU se o nome do cliente corresponder.
+    const filtroAtivo = filtro.trim().toLowerCase();
+    if (filtroAtivo === '') {
+      return true; // Filtro vazio, inclui a cobrança
+    } else {
+      return cliente.nome.toLowerCase().includes(filtroAtivo); // Filtro ativo, verifica o nome
+    }
   });
 
   // Sua função gerarPDF e gerarTXT podem ser copiadas para cá, com uma pequena modificação
-  // Dentro de src/pages/CobrancasPage.js
-
   // Dentro de src/pages/CobrancasPage.js
 
   const gerarPDF = () => {

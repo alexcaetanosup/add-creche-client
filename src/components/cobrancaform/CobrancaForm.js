@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const CobrancaForm = ({ onSave, cobrancaAtual, onCancel, clientes }) => {
     // Função para obter a data de hoje no formato AAAA-MM-DD
@@ -11,13 +11,13 @@ const CobrancaForm = ({ onSave, cobrancaAtual, onCancel, clientes }) => {
     };
 
     // Define o estado inicial de forma clara
-    const getInitialState = () => ({
-        clienteId: '', // Começa como string vazia para o <select>
+    const getInitialState = useCallback(() => ({
+        clienteId: '',
         descricao: 'Colaboração Espontânea',
         valor: '',
         vencimento: getTodayDate(),
-        status: 'Pago'
-    });
+        status: 'Pendente'
+    }), []); // Note o , []); no final.
 
     const [cobranca, setCobranca] = useState(getInitialState());
 
@@ -33,7 +33,7 @@ const CobrancaForm = ({ onSave, cobrancaAtual, onCancel, clientes }) => {
         } else {
             setCobranca(getInitialState());
         }
-    }, [cobrancaAtual]);
+    }, [cobrancaAtual, getInitialState]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
