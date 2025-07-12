@@ -1,10 +1,11 @@
+// Substitua o conteúdo de src/components/CobrancaList.js
 import React from 'react';
 
 const CobrancaList = ({
     cobrancas = [],
     clientes = [],
-    onEdit,
-    onDelete,
+    onEdit = () => { },
+    onDelete = () => { },
     selectedCobrancas = new Set(),
     onSelectCobranca = () => { },
     onSelectAll = () => { },
@@ -23,7 +24,6 @@ const CobrancaList = ({
     };
 
     const getClienteName = (clienteId) => {
-        // A verificação crucial acontece aqui. Se 'clientes' for undefined, não vai quebrar.
         if (!clientes || clientes.length === 0 || !clienteId) {
             return 'Cliente Desconhecido';
         }

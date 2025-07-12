@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import CobrancaList from '../components/CobrancaList.js';
 import CobrancaForm from '../components/CobrancaForm.js';
 import ArquivosRemessa from '../components/ArquivosRemessa.js';
@@ -26,27 +26,20 @@ const CobrancasPage = () => {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [cobrancasRes, clientesRes, configRes] = await Promise.all([
-        fetch(API_COBRANCAS_URL),
-        fetch(API_CLIENTES_URL),
-        fetch(API_CONFIG_URL)
+      const responses = await Promise.all([
+        fetch(API_COBRANCAS_URL), fetch(API_CLIENTES_URL), fetch(API_CONFIG_URL)
       ]);
-      // Verificação de segurança para cada resposta
-      if (!cobrancasRes.ok || !clientesRes.ok || !configRes.ok) {
-        throw new Error('Falha ao buscar um ou mais recursos da API.');
+      for (const response of responses) {
+        if (!response.ok) throw new Error(`Falha na API: ${response.url} respondeu com status ${response.status}`);
       }
-      const cobrancasData = await cobrancasRes.json();
-      const clientesData = await clientesRes.json();
-      const configData = await configRes.json();
-
+      const [cobrancasData, clientesData, configData] = await Promise.all(responses.map(r => r.json()));
       setCobrancas(Array.isArray(cobrancasData) ? cobrancasData : []);
       setClientes(Array.isArray(clientesData) ? clientesData : []);
       setConfig(configData || null);
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
-      setCobrancas([]);
-      setClientes([]);
-      setConfig(null);
+      alert(`Não foi possível carregar os dados. Verifique se o servidor backend está rodando. Erro: ${error.message}`);
+      setCobrancas([]); setClientes([]); setConfig(null);
     } finally {
       setIsLoading(false);
     }
@@ -56,15 +49,17 @@ const CobrancasPage = () => {
     fetchData();
   }, [fetchData]);
 
-  // --- LÓGICA DE FILTRAGEM ---
-  const cobrancasFiltradas = cobrancas.filter(c => {
-    const remessaPendente = c.statusRemessa === 'pendente';
-    if (!remessaPendente) return false;
-    const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
-    if (!cliente) return false;
-    const filtroAtivo = filtro.trim().toLowerCase();
-    return filtroAtivo === '' || cliente.nome.toLowerCase().includes(filtroAtivo);
-  });
+  // --- LÓGICA DE FILTRAGEM COM useMemo ---
+  const cobrancasFiltradas = useMemo(() => {
+    if (!Array.isArray(clientes) || !Array.isArray(cobrancas)) return [];
+    return cobrancas.filter(c => {
+      if (c.statusRemessa !== 'pendente') return false;
+      const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
+      if (!cliente) return false;
+      const filtroAtivo = filtro.trim().toLowerCase();
+      return filtroAtivo === '' || cliente.nome.toLowerCase().includes(filtroAtivo);
+    });
+  }, [cobrancas, clientes, filtro]);
 
   // --- FUNÇÕES DE SELEÇÃO ---
   const handleSelectCobranca = (cobrancaId) => {
@@ -84,7 +79,7 @@ const CobrancasPage = () => {
     }
   };
 
-  // --- FUNÇÕES DE CRUD (COMPLETAS) ---
+  // --- FUNÇÕES DE CRUD ---
   const handleSave = async (cobranca) => {
     if (!cobranca.clienteId) {
       alert("ERRO: Por favor, selecione um cliente.");
@@ -134,7 +129,7 @@ const CobrancasPage = () => {
     setIsFormVisible(true);
   };
 
-  // --- FUNÇÕES DE REMESSA (COMPLETAS) ---
+  // --- FUNÇÕES DE REMESSA ---
   const handleFinalizarRemessa = async () => {
     const cobrancasParaFinalizar = cobrancas.filter(c => selectedCobrancas.has(c.id));
     if (cobrancasParaFinalizar.length === 0) {
@@ -166,7 +161,6 @@ const CobrancasPage = () => {
     }
   };
 
-  // --- FUNÇÕES DE GERAÇÃO DE RELATÓRIOS (INCLUÍDAS) ---
   const gerarPDF = () => {
     const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
     if (cobrancasParaProcessar.length === 0) {
@@ -192,11 +186,8 @@ const CobrancasPage = () => {
     doc.save('relatorio_cobrancas.pdf');
   };
 
-  // Substitua sua função gerarTXT por esta, dentro de CobrancasPage.js
-
   const gerarTXT = async () => {
     const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
-
     if (cobrancasParaProcessar.length === 0) {
       alert("Nenhuma cobrança selecionada para gerar a remessa.");
       return;
@@ -214,68 +205,31 @@ const CobrancasPage = () => {
     try {
       const formatText = (text = '', length) => String(text).substring(0, length).padEnd(length, ' ');
       const formatNumber = (num = 0, length) => String(num).replace(/[^0-9]/g, '').padStart(length, '0');
-
       const layout = {
-        header: {
-          TIPO_REGISTRO: 1, COD_SERVICO: 1, CONVENIO: 20, NOME_EMPRESA: 20,
-          COD_BANCO: 3, NOME_BANCO: 20, DATA_GERACAO: 8, NSA: 8,
-          VERSAO_LAYOUT: 40, ID_SISTEMA: 29
-        },
-        detail: {
-          TIPO_REGISTRO: 1, CODIGO_CLIENTE: 25, DADOS_BANCARIOS: 20,
-          DATA_VENCIMENTO: 8, VALOR_DEBITO: 15, COD_MOEDA: 1,
-          BRANCOS: 79, COD_OCORRENCIA: 1
-        },
-        trailer: {
-          TIPO_REGISTRO: 1, TOTAL_REGISTROS: 6, SOMA_VALORES: 18, BRANCOS: 125
-        }
+        header: { TIPO_REGISTRO: 1, COD_SERVICO: 1, CONVENIO: 20, NOME_EMPRESA: 20, COD_BANCO: 3, NOME_BANCO: 20, DATA_GERACAO: 8, NSA: 8, VERSAO_LAYOUT: 40, ID_SISTEMA: 29 },
+        detail: { TIPO_REGISTRO: 1, CODIGO_CLIENTE: 25, DADOS_BANCARIOS: 20, DATA_VENCIMENTO: 8, VALOR_DEBITO: 15, COD_MOEDA: 1, BRANCOS: 79, COD_OCORRENCIA: 1 },
+        trailer: { TIPO_REGISTRO: 1, TOTAL_REGISTROS: 6, SOMA_VALORES: 18, BRANCOS: 125 }
       };
-
-      const empresa = {
-        codigoConvenio: '00330043002501218126',
-        nome: 'CRECHE BERCARIO NANA',
-        banco: '033',
-        nomeBanco: 'BANCO SANTANDER',
-      };
+      const empresa = { codigoConvenio: '00330043002501218126', nome: 'CRECHE BERCARIO NANA', banco: '033', nomeBanco: 'BANCO SANTANDER' };
       const idSistema = 'G4DB160609';
-
       const buildLine = (type, data) => {
         let line = '';
         for (const field in layout[type]) {
           const size = layout[type][field];
           const value = data[field] || '';
-          if (['CODIGO_CLIENTE', 'DADOS_BANCARIOS'].includes(field)) {
-            line += formatText(value, size);
-          } else if (typeof value === 'number' || !isNaN(value) && String(value).trim() !== '') {
-            line += formatNumber(value, size);
-          } else {
-            line += formatText(value, size);
-          }
+          if (['CODIGO_CLIENTE', 'DADOS_BANCARIOS'].includes(field)) line += formatText(value, size);
+          else if (typeof value === 'number' || !isNaN(value) && String(value).trim() !== '') line += formatNumber(value, size);
+          else line += formatText(value, size);
         }
         return line;
       };
 
       const dataGeracao = new Date();
-      const dataGeracaoFormatada = formatNumber(dataGeracao.getFullYear(), 4) +
-        formatNumber(dataGeracao.getMonth() + 1, 2) +
-        formatNumber(dataGeracao.getDate(), 2);
-
+      const dataGeracaoFormatada = formatNumber(dataGeracao.getFullYear(), 4) + formatNumber(dataGeracao.getMonth() + 1, 2) + formatNumber(dataGeracao.getDate(), 2);
       const parteFixa = config.parteFixaNsa || '04';
       const nsaCompleto = `${String(novoNsaSequencial).padStart(6, '0')}${parteFixa}`;
 
-      // --- CÓDIGO CORRIGIDO ---
-      const headerData = {
-        TIPO_REGISTRO: 'A',
-        COD_SERVICO: '1',
-        CONVENIO: empresa.codigoConvenio,
-        NOME_EMPRESA: empresa.nome,
-        COD_BANCO: empresa.banco,
-        NOME_BANCO: empresa.nomeBanco,
-        DATA_GERACAO: dataGeracaoFormatada,
-        NSA: nsaCompleto,
-        VERSAO_LAYOUT: 'DEBITO AUTOMATICO',
-        ID_SISTEMA: idSistema
-      };
+      const headerData = { TIPO_REGISTRO: 'A', COD_SERVICO: '1', CONVENIO: empresa.codigoConvenio, NOME_EMPRESA: empresa.nome, COD_BANCO: empresa.banco, NOME_BANCO: empresa.nomeBanco, DATA_GERACAO: dataGeracaoFormatada, NSA: nsaCompleto, VERSAO_LAYOUT: 'DEBITO AUTOMATICO', ID_SISTEMA: idSistema };
       const headerLine = buildLine('header', headerData);
 
       let detailLines = [];
@@ -284,28 +238,13 @@ const CobrancasPage = () => {
         const cliente = clientes.find(cli => Number(cli.id) === Number(cobranca.clienteId));
         if (!cliente) return;
         totalValorCobrado += cobranca.valor;
-        const detailData = {
-          TIPO_REGISTRO: 'E',
-          CODIGO_CLIENTE: cliente.codigo,
-          DADOS_BANCARIOS: cliente.contaCorrente,
-          DATA_VENCIMENTO: cobranca.vencimento.replace(/-/g, ''),
-          VALOR_DEBITO: cobranca.valor * 100,
-          COD_MOEDA: '3',
-          BRANCOS: '',
-          COD_OCORRENCIA: '0'
-        };
+        const detailData = { TIPO_REGISTRO: 'E', CODIGO_CLIENTE: cliente.codigo, DADOS_BANCARIOS: cliente.contaCorrente, DATA_VENCIMENTO: cobranca.vencimento.replace(/-/g, ''), VALOR_DEBITO: cobranca.valor * 100, COD_MOEDA: '3', BRANCOS: '', COD_OCORRENCIA: '0' };
         detailLines.push(buildLine('detail', detailData));
       });
 
       const totalRegistros = cobrancasParaProcessar.length + 2;
-      const trailerData = {
-        TIPO_REGISTRO: 'Z',
-        TOTAL_REGISTROS: totalRegistros,
-        SOMA_VALORES: totalValorCobrado * 100,
-        BRANCOS: ''
-      };
+      const trailerData = { TIPO_REGISTRO: 'Z', TOTAL_REGISTROS: totalRegistros, SOMA_VALORES: totalValorCobrado * 100, BRANCOS: '' };
       const trailerLine = buildLine('trailer', trailerData);
-      // --- FIM DO CÓDIGO CORRIGIDO ---
 
       finalContent = [headerLine, ...detailLines, trailerLine].join('\n');
 
@@ -340,7 +279,12 @@ const CobrancasPage = () => {
 
   // --- RENDERIZAÇÃO CONDICIONAL PRINCIPAL ---
   if (isLoading) {
-    return <p>Carregando dados do sistema...</p>;
+    return (
+      <div className="App">
+        <h1>Gerenciamento de Cobranças</h1>
+        <p>Carregando dados do sistema...</p>
+      </div>
+    );
   }
 
   // --- RENDERIZAÇÃO DO COMPONENTE ---
