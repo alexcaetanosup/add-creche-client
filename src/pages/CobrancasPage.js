@@ -1,39 +1,39 @@
-import React, { useState, useEffect, useCallback } from "react";
-import CobrancaList from "../components/cobrancalist/CobrancaList";
-import CobrancaForm from "../components/cobrancaform/CobrancaForm";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import React, { useState, useEffect, useCallback } from 'react';
+import CobrancaList from '../components/CobrancaList';
+import CobrancaForm from '../components/CobrancaForm';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
-const API_COBRANCAS_URL = "http://localhost:3001/cobrancas";
-const API_CLIENTES_URL = "http://localhost:3001/clientes";
-const API_CONFIG_URL = "http://localhost:3001/config";
-
+// Configuração das URLs da API
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_CLIENTES_URL = `${API_BASE_URL}/api/clientes`;
+const API_COBRANCAS_URL = `${API_BASE_URL}/api/cobrancas`;
+const API_CONFIG_URL = `${API_BASE_URL}/api/config`;
+
 
 const CobrancasPage = () => {
+  // --- ESTADOS DO COMPONENTE ---
   const [cobrancas, setCobrancas] = useState([]);
   const [clientes, setClientes] = useState([]);
-  const [config, setConfig] = useState(null); // <-- NOVO ESTADO PARA A CONFIG
+  const [config, setConfig] = useState(null);
   const [cobrancaAtual, setCobrancaAtual] = useState(null);
-  const [filtro, setFiltro] = useState("");
+  const [filtro, setFiltro] = useState('');
   const [isFormVisible, setIsFormVisible] = useState(false);
-  const [selectedCobrancas, setSelectedCobrancas] = useState(new Set()); // <-- NOVO ESTADO
 
+  // --- FUNÇÃO PARA BUSCAR DADOS INICIAIS ---
   const fetchData = useCallback(async () => {
     try {
       const [cobrancasRes, clientesRes, configRes] = await Promise.all([
         fetch(API_COBRANCAS_URL),
         fetch(API_CLIENTES_URL),
-        fetch(API_CONFIG_URL), // <-- BUSCA A CONFIGURAÇÃO
+        fetch(API_CONFIG_URL)
       ]);
       const cobrancasData = await cobrancasRes.json();
       const clientesData = await clientesRes.json();
-      const configData = await configRes.json(); // <-- ARMAZENA A CONFIGURAÇÃO
+      const configData = await configRes.json();
       setCobrancas(cobrancasData);
       setClientes(clientesData);
-      if (configData && configData.length > 0) {
-        setConfig(configData[0]);
-      }
+      setConfig(configData);
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
     }
@@ -43,80 +43,58 @@ const CobrancasPage = () => {
     fetchData();
   }, [fetchData]);
 
-  // Em src/pages/CobrancasPage.js
+  // --- LÓGICA DE FILTRAGEM (CORRIGIDA) ---
+  const cobrancasFiltradas = cobrancas.filter(c => {
+    const remessaPendente = c.statusRemessa === 'pendente';
+    if (!remessaPendente) return false;
+
+    const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
+    if (!cliente) return false;
+
+    const filtroAtivo = filtro.trim().toLowerCase();
+    return filtroAtivo === '' || cliente.nome.toLowerCase().includes(filtroAtivo);
+  });
+
+  // --- FUNÇÕES DE CRUD (handleSave, handleDelete, etc.) ---
 
   const handleSave = async (cobranca) => {
-    // 1. Validação de Entrada: Se por algum motivo chegou uma cobrança sem clienteId, pare aqui.
-    if (!cobranca.clienteId || cobranca.clienteId === "") {
-      console.error(
-        "Tentativa de salvar cobrança sem clienteId. Operação cancelada.",
-        cobranca
-      );
-      alert(
-        "ERRO: A cobrança não pode ser salva sem um cliente. Por favor, tente novamente."
-      );
-      return; // Interrompe a execução da função
+    if (!cobranca.clienteId) {
+      alert("ERRO: Por favor, selecione um cliente.");
+      return;
     }
 
-    const method = cobranca.id ? "PUT" : "POST";
-    const url = cobranca.id
-      ? `${API_COBRANCAS_URL}/${cobranca.id}`
-      : API_COBRANCAS_URL;
+    const method = cobranca.id ? 'PUT' : 'POST';
+    const url = cobranca.id ? `${API_COBRANCAS_URL}/${cobranca.id}` : API_COBRANCAS_URL;
 
-    // 2. Preparação do Payload: Garante que os tipos estão corretos
     const payload = {
       ...cobranca,
-      clienteId: Number(cobranca.clienteId), // Converte para Número
-      valor: Number(cobranca.valor), // Converte para Número
+      clienteId: Number(cobranca.clienteId),
+      valor: Number(cobranca.valor)
     };
 
-    // Se for um novo registro, o 'id' pode ser undefined ou null. O json-server cria o id.
-    // Se for uma edição, o 'id' já existe no payload.
-    // if (!payload.id) {
-    //     delete payload.id;
-    // }
-
     if (!cobranca.id) {
-      // Se for um novo registro, define o status da remessa como pendente
-      payload.statusRemessa = "pendente";
+      payload.statusRemessa = 'pendente';
       delete payload.id;
     }
 
-    // 3. Log para Depuração: Vamos ver exatamente o que está sendo enviado
-    console.log("Enviando para a API:", { url, method, payload });
-
     try {
       const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
-
-      if (response.ok) {
-        console.log("Salvo com sucesso!");
-        fetchData();
-        setIsFormVisible(false);
-        setCobrancaAtual(null);
-      } else {
-        const errorText = await response.text();
-        console.error(
-          "Erro ao salvar cobrança. Status:",
-          response.status,
-          "Resposta do servidor:",
-          errorText
-        );
-        alert("Ocorreu um erro no servidor ao salvar a cobrança.");
-      }
+      if (!response.ok) throw new Error('Falha ao salvar cobrança.');
+      fetchData();
+      setIsFormVisible(false);
+      setCobrancaAtual(null);
     } catch (error) {
-      console.error("Erro de rede ao salvar cobrança:", error);
-      alert("Não foi possível conectar ao servidor para salvar a cobrança.");
+      console.error("Erro ao salvar cobrança:", error);
+      alert(error.message);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Tem certeza que deseja deletar esta cobrança?")) {
+    if (window.confirm('Tem certeza que deseja deletar esta cobrança?')) {
       try {
-        await fetch(`${API_COBRANCAS_URL}/${id}`, { method: "DELETE" });
+        await fetch(`${API_COBRANCAS_URL}/${id}`, { method: 'DELETE' });
         fetchData();
       } catch (error) {
         console.error("Erro ao deletar cobrança:", error);
@@ -129,100 +107,36 @@ const CobrancasPage = () => {
     setIsFormVisible(true);
   };
 
-  // Em src/pages/CobrancasPage.js
-
-  // Em src/pages/CobrancasPage.js
+  // --- FUNÇÕES DE REMESSA ---
 
   const handleFinalizarRemessa = async () => {
-    // A função getCobrancasParaProcessar() não existe no código fornecido,
-    // então vamos usar cobrancasFiltradas que já contém as cobranças pendentes.
-    const cobrancasParaFinalizar = cobrancasFiltradas;
-
-    if (cobrancasParaFinalizar.length === 0) {
+    if (cobrancasFiltradas.length === 0) {
       alert("Não há cobranças pendentes para finalizar.");
       return;
     }
-
-    // Determina o nome do arquivo do mês anterior
     const hoje = new Date();
     const mesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-    const ano = mesAnterior.getFullYear();
-    const mes = String(mesAnterior.getMonth() + 1).padStart(2, '0');
-    const nomeArquivo = `${ano}_${mes}`;
+    const nomeArquivo = `${mesAnterior.getFullYear()}_${String(mesAnterior.getMonth() + 1).padStart(2, '0')}`;
 
-    const confirmacao = window.confirm(
-      `Você confirma o arquivamento de ${cobrancasParaFinalizar.length} cobrança(s)?\n\n` +
-      `Elas serão movidas do banco de dados principal para um arquivo de histórico chamado "remessa_${nomeArquivo}.json" e não poderão ser editadas por esta interface.`
-    );
-
-    if (confirmacao) {
+    if (window.confirm(`Confirma o arquivamento de ${cobrancasFiltradas.length} cobrança(s) para "remessa_${nomeArquivo}.json"?`)) {
       try {
         const response = await fetch(`${API_BASE_URL}/api/arquivar-remessa`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            cobrancasParaArquivar: cobrancasParaFinalizar,
-            mesAno: nomeArquivo
-          }),
+          body: JSON.stringify({ cobrancasParaArquivar: cobrancasFiltradas, mesAno: nomeArquivo }),
         });
-
         if (!response.ok) {
-          // Se a resposta não for OK, lança um erro com a mensagem do servidor
           const errorData = await response.json();
           throw new Error(errorData.message || 'Falha ao arquivar a remessa.');
         }
-
         alert("Remessa finalizada e arquivada com sucesso!");
-        fetchData(); // Recarrega os dados para atualizar a tela, que agora estará vazia.
-
+        fetchData();
       } catch (error) {
         console.error("Erro ao finalizar e arquivar remessa:", error);
-        // Verifica se o erro foi por causa de um JSON inválido
-        if (error instanceof SyntaxError) {
-          alert("Ocorreu um erro de comunicação com o servidor. A resposta não era um JSON válido.");
-        } else {
-          alert(`Ocorreu um erro: ${error.message}`);
-        }
+        alert(`Ocorreu um erro: ${error.message}`);
       }
     }
   };
-
-  const handleSelectCobranca = (cobrancaId) => {
-    setSelectedCobrancas((prevSelected) => {
-      const newSelected = new Set(prevSelected);
-      if (newSelected.has(cobrancaId)) {
-        newSelected.delete(cobrancaId); // Desmarca se já estiver marcado
-      } else {
-        newSelected.add(cobrancaId); // Marca se não estiver marcado
-      }
-      return newSelected;
-    });
-  };
-
-  // Dentro de src/pages/CobrancasPage.js
-
-  const cobrancasFiltradas = cobrancas.filter(c => {
-    // Primeira condição: a cobrança DEVE ser pendente de remessa.
-    const remessaPendente = c.statusRemessa === 'pendente';
-    if (!remessaPendente) {
-      return false;
-    }
-
-    // Segunda condição: a cobrança DEVE ter um cliente associado.
-    const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
-    if (!cliente) {
-      return false;
-    }
-
-    // Se passou pelas condições acima, agora aplicamos o filtro de texto.
-    // A cobrança será incluída se o filtro estiver vazio OU se o nome do cliente corresponder.
-    const filtroAtivo = filtro.trim().toLowerCase();
-    if (filtroAtivo === '') {
-      return true; // Filtro vazio, inclui a cobrança
-    } else {
-      return cliente.nome.toLowerCase().includes(filtroAtivo); // Filtro ativo, verifica o nome
-    }
-  });
 
   // Sua função gerarPDF e gerarTXT podem ser copiadas para cá, com uma pequena modificação
   // Dentro de src/pages/CobrancasPage.js
@@ -417,8 +331,8 @@ const CobrancasPage = () => {
   };
   // ... (antes do return)
 
+  // --- RENDERIZAÇÃO DO COMPONENTE ---
   return (
-
     <div>
       <h1>Gerenciamento de Cobranças</h1>
       <div className="action-bar">
@@ -432,45 +346,26 @@ const CobrancasPage = () => {
         </div>
         <div className="button-group">
           {!isFormVisible && (
-            <button
-              onClick={() => setIsFormVisible(true)}
-              className="btn-primary"
-            >
-              Nova Cobrança
-            </button>
+            <button onClick={() => setIsFormVisible(true)} className="btn-primary">Nova Cobrança</button>
           )}
-          <button onClick={gerarPDF} className="btn-secondary">
-            Gerar PDF
-          </button>
-          {/* Coloque o botão de Gerar TXT aqui */}
-          <button onClick={gerarTXT} className="btn-tertiary">
-            Gerar TXT
-          </button>
-          <button onClick={handleFinalizarRemessa} className="btn-archive">
-            Limpar Remessa
-          </button>
+          <button onClick={gerarPDF} className="btn-secondary">Gerar PDF</button>
+          <button onClick={gerarTXT} className="btn-tertiary">Gerar TXT</button>
+          <button onClick={handleFinalizarRemessa} className="btn-archive">Finalizar Remessa</button>
         </div>
       </div>
-
       {isFormVisible && (
         <CobrancaForm
           onSave={handleSave}
           cobrancaAtual={cobrancaAtual}
-          clientes={clientes} // Passa a lista de clientes para o formulário
-          onCancel={() => {
-            setIsFormVisible(false);
-            setCobrancaAtual(null);
-          }}
+          clientes={clientes}
+          onCancel={() => { setIsFormVisible(false); setCobrancaAtual(null); }}
         />
       )}
-
       <CobrancaList
         cobrancas={cobrancasFiltradas}
         clientes={clientes}
         onEdit={handleEdit}
         onDelete={handleDelete}
-        selectedCobrancas={selectedCobrancas} // <-- NOVA PROP
-        onSelectCobranca={handleSelectCobranca} // <-- NOVA PROP
       />
     </div>
   );
