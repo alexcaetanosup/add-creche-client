@@ -64,22 +64,59 @@ const CobrancasPage = () => {
       alert("ERRO: Por favor, selecione um cliente.");
       return;
     }
+
     const method = cobranca.id ? 'PUT' : 'POST';
     const url = cobranca.id ? `${API_COBRANCAS_URL}/${cobranca.id}` : API_COBRANCAS_URL;
-    const payload = { ...cobranca, clienteId: Number(cobranca.clienteId), valor: Number(cobranca.valor) };
-    if (!cobranca.id) {
+
+    // --- INÍCIO DA MUDANÇA ---
+
+    // 1. Cria o payload base com os tipos de dados corretos.
+    const payload = {
+      ...cobranca,
+      clienteId: Number(cobranca.clienteId),
+      valor: Number(cobranca.valor)
+    };
+
+    // 2. Garante que o statusRemessa exista.
+    // Se for uma nova cobrança, define como 'pendente'.
+    // Se for uma edição, mantém o valor que já veio em 'cobranca'.
+    if (!payload.statusRemessa) {
       payload.statusRemessa = 'pendente';
+    }
+
+    // 3. Remove o ID se for uma operação de POST (criação).
+    if (!cobranca.id) {
       delete payload.id;
     }
+
+    // --- FIM DA MUDANÇA ---
+
     try {
-      const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (!response.ok) throw new Error('Falha ao salvar cobrança.');
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        // Tenta ler o erro como JSON, se falhar, usa o texto.
+        let errorMsg = 'Falha ao salvar cobrança.';
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.message || errorData.error || errorMsg;
+        } catch (e) {
+          errorMsg = await response.text();
+        }
+        throw new Error(errorMsg);
+      }
+
       fetchData();
       setIsFormVisible(false);
       setCobrancaAtual(null);
+
     } catch (error) {
       console.error("Erro ao salvar cobrança:", error);
-      alert(error.message);
+      alert(`Ocorreu um erro: ${error.message}`);
     }
   };
 
