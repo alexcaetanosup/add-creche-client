@@ -5,14 +5,31 @@ const ArquivosRemessa = ({ apiBaseUrl }) => {
     const [arquivos, setArquivos] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // Em ArquivosRemessa.js
+
     useEffect(() => {
         const fetchArquivos = async () => {
             try {
                 const response = await fetch(`${apiBaseUrl}/api/listar-arquivos`);
+
+                // Verifica se a resposta da API foi bem-sucedida
+                if (!response.ok) {
+                    // Se não foi, lança um erro para ser pego pelo catch
+                    throw new Error('Falha ao buscar a lista de arquivos.');
+                }
+
                 const data = await response.json();
-                setArquivos(data);
+
+                // Garante que estamos sempre salvando um array no estado
+                if (Array.isArray(data)) {
+                    setArquivos(data);
+                } else {
+                    setArquivos([]); // Se a resposta não for um array, define como array vazio
+                }
+
             } catch (error) {
                 console.error("Erro ao buscar lista de arquivos:", error);
+                setArquivos([]); // Em caso de erro, garante que 'arquivos' seja um array vazio
             } finally {
                 setLoading(false);
             }
@@ -20,10 +37,6 @@ const ArquivosRemessa = ({ apiBaseUrl }) => {
 
         fetchArquivos();
     }, [apiBaseUrl]);
-
-    if (loading) {
-        return <p>Carregando lista de arquivos arquivados...</p>;
-    }
 
     return (
         <div className="arquivos-container">
