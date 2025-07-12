@@ -22,6 +22,7 @@ const CobrancasPage = () => {
   const [cobrancaAtual, setCobrancaAtual] = useState(null);
   const [filtro, setFiltro] = useState('');
   const [isFormVisible, setIsFormVisible] = useState(false);
+  const [selectedCobrancas, setSelectedCobrancas] = useState(new Set());
 
   // --- FUNÇÃO PARA BUSCAR DADOS INICIAIS ---
   const fetchData = useCallback(async () => {
@@ -121,6 +122,29 @@ const CobrancasPage = () => {
     }
   };
 
+  const handleSelectCobranca = (cobrancaId) => {
+    setSelectedCobrancas(prevSelected => {
+      const newSelected = new Set(prevSelected);
+      if (newSelected.has(cobrancaId)) {
+        newSelected.delete(cobrancaId);
+      } else {
+        newSelected.add(cobrancaId);
+      }
+      return newSelected;
+    });
+  };
+
+  const handleSelectAll = () => {
+    // Se todos já estão selecionados, limpa a seleção.
+    // Senão, seleciona todos da lista filtrada atual.
+    if (selectedCobrancas.size === cobrancasFiltradas.length) {
+      setSelectedCobrancas(new Set());
+    } else {
+      const allIds = new Set(cobrancasFiltradas.map(c => c.id));
+      setSelectedCobrancas(allIds);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja deletar esta cobrança?')) {
       try {
@@ -139,35 +163,69 @@ const CobrancasPage = () => {
 
   // --- FUNÇÕES DE REMESSA (CORRIGIDAS) ---
 
+  // Cole esta função completa dentro do seu componente CobrancasPage.js
+
   const handleFinalizarRemessa = async () => {
-    if (cobrancasFiltradas.length === 0) {
-      alert("Não há cobranças pendentes para finalizar.");
+    // --- NOVA LÓGICA: PEGAR APENAS AS COBRANÇAS SELECIONADAS ---
+    // Filtra a lista principal de cobranças para encontrar os objetos completos correspondentes aos IDs selecionados.
+    const cobrancasParaFinalizar = cobrancas.filter(c => selectedCobrancas.has(c.id));
+
+    // --- VALIDAÇÃO INICIAL ---
+    if (cobrancasParaFinalizar.length === 0) {
+      alert("Nenhuma cobrança selecionada para finalizar e arquivar.");
       return;
     }
-    const hoje = new Date();
-    const mesAnterior = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-    const nomeArquivo = `${mesAnterior.getFullYear()}_${String(mesAnterior.getMonth() + 1).padStart(2, '0')}`;
 
-    if (window.confirm(`Confirma o arquivamento de ${cobrancasFiltradas.length} cobrança(s) para "remessa_${nomeArquivo}.json"?`)) {
+    // --- CÁLCULO DO NOME DO ARQUIVO DE ARQUIVAMENTO ---
+    const hoje = new Date();
+    // Pega o mês atual para o nome do arquivo, pois a remessa é do mês corrente.
+    const mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const ano = mesAtual.getFullYear();
+    const mes = String(mesAtual.getMonth() + 1).padStart(2, '0');
+    const nomeArquivo = `${ano}_${mes}`;
+
+    // --- CONFIRMAÇÃO DO USUÁRIO ---
+    const confirmacao = window.confirm(
+      `Você confirma o arquivamento de ${cobrancasParaFinalizar.length} cobrança(s) selecionada(s)?\n\n` +
+      `Elas serão removidas da lista de pendentes e salvas no histórico "remessa_${nomeArquivo}.json".`
+    );
+
+    if (confirmacao) {
       try {
+        // --- REQUISIÇÃO PARA A API DE ARQUIVAMENTO ---
         const response = await fetch(`${API_BASE_URL}/api/arquivar-remessa`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cobrancasParaArquivar: cobrancasFiltradas, mesAno: nomeArquivo }),
+          body: JSON.stringify({
+            cobrancasParaArquivar: cobrancasParaFinalizar, // <-- USA A LISTA CORRETA
+            mesAno: nomeArquivo
+          }),
         });
+
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Falha ao arquivar a remessa.');
+          // Tenta ler a mensagem de erro do servidor
+          let errorMsg = 'Falha ao arquivar a remessa.';
+          try {
+            const errorData = await response.json();
+            errorMsg = errorData.message || errorMsg;
+          } catch (e) {
+            // A resposta de erro pode não ser JSON
+          }
+          throw new Error(errorMsg);
         }
+
         alert("Remessa finalizada e arquivada com sucesso!");
+
+        // Limpa a seleção e recarrega os dados para atualizar a tela
+        setSelectedCobrancas(new Set());
         fetchData();
+
       } catch (error) {
         console.error("Erro ao finalizar e arquivar remessa:", error);
         alert(`Ocorreu um erro: ${error.message}`);
       }
     }
   };
-
   const gerarPDF = () => {
     const doc = new jsPDF();
     doc.text("Relatório de Cobranças Pendentes", 14, 16);
@@ -188,38 +246,151 @@ const CobrancasPage = () => {
     doc.save('relatorio_cobrancas.pdf');
   };
 
+  // Cole esta função completa dentro do seu componente CobrancasPage.js
+
   const gerarTXT = async () => {
-    if (!config || cobrancasFiltradas.length === 0) {
-      alert("Não há dados de configuração ou cobranças pendentes para gerar a remessa.");
+    // --- NOVA LÓGICA: PEGAR APENAS AS COBRANÇAS SELECIONADAS ---
+    // Filtra a lista principal de cobranças para encontrar os objetos completos correspondentes aos IDs selecionados.
+    const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
+
+    // --- VALIDAÇÃO INICIAL ---
+    if (cobrancasParaProcessar.length === 0) {
+      alert("Nenhuma cobrança selecionada para gerar a remessa.");
+      return;
+    }
+    if (!config || typeof config.ultimoNsaSequencial === 'undefined') {
+      alert("Erro: Configurações do sistema (NSA) não carregadas. Tente recarregar a página.");
       return;
     }
 
+    // --- GERENCIAMENTO E CONFIRMAÇÃO DO NSA ---
     const novoNsaSequencial = config.ultimoNsaSequencial + 1;
-    const confirmacao = window.confirm(`Confirmar a geração do arquivo com o novo NSA: ${novoNsaSequencial}?`);
+    const confirmacao = window.confirm(
+      `Será gerado um arquivo de remessa com ${cobrancasParaProcessar.length} cobrança(s) selecionada(s).\n` +
+      `O novo NSA será: ${novoNsaSequencial}\n\n` +
+      `Confirmar a geração?`
+    );
     if (!confirmacao) return;
 
-    // ... COLE A SUA LÓGICA COMPLETA E FUNCIONAL DE GERAR O ARQUIVO TXT AQUI ...
-    // É importante que esta parte esteja completa.
-
-    // Exemplo da parte final da função:
+    // --- INÍCIO DA LÓGICA DE GERAÇÃO DO ARQUIVO ---
+    let finalContent = '';
     try {
-      // ... (montagem do arquivo)
-      // const finalContent = ...
-      // const blob = ...
-      // link.click();
+      // --- FUNÇÕES, LAYOUT E DADOS FIXOS ---
+      const formatText = (text = '', length) => String(text).substring(0, length).padEnd(length, ' ');
+      const formatNumber = (num = 0, length) => String(num).replace(/[^0-9]/g, '').padStart(length, '0');
 
+      const layout = {
+        header: {
+          TIPO_REGISTRO: 1, COD_SERVICO: 1, CONVENIO: 20, NOME_EMPRESA: 20,
+          COD_BANCO: 3, NOME_BANCO: 20, DATA_GERACAO: 8, NSA: 8,
+          VERSAO_LAYOUT: 40, ID_SISTEMA: 29
+        },
+        detail: {
+          TIPO_REGISTRO: 1, CODIGO_CLIENTE: 25, DADOS_BANCARIOS: 20,
+          DATA_VENCIMENTO: 8, VALOR_DEBITO: 15, COD_MOEDA: 1,
+          BRANCOS: 79, COD_OCORRENCIA: 1
+        },
+        trailer: {
+          TIPO_REGISTRO: 1, TOTAL_REGISTROS: 6, SOMA_VALORES: 18, BRANCOS: 125
+        }
+      };
+
+      const empresa = {
+        codigoConvenio: '00330043002501218126',
+        nome: 'CRECHE BERCARIO NANA',
+        banco: '033',
+        nomeBanco: 'BANCO SANTANDER',
+      };
+      const idSistema = 'G4DB160609';
+
+      const buildLine = (type, data) => {
+        let line = '';
+        for (const field in layout[type]) {
+          const size = layout[type][field];
+          const value = data[field] || '';
+          if (['CODIGO_CLIENTE', 'DADOS_BANCARIOS'].includes(field)) {
+            line += formatText(value, size);
+          } else if (typeof value === 'number' || !isNaN(value) && String(value).trim() !== '') {
+            line += formatNumber(value, size);
+          } else {
+            line += formatText(value, size);
+          }
+        }
+        return line;
+      };
+
+      const dataGeracao = new Date();
+      const dataGeracaoFormatada = formatNumber(dataGeracao.getFullYear(), 4) +
+        formatNumber(dataGeracao.getMonth() + 1, 2) +
+        formatNumber(dataGeracao.getDate(), 2);
+
+      const parteFixa = config.parteFixaNsa || '04';
+      const nsaCompleto = `${String(novoNsaSequencial).padStart(6, '0')}${parteFixa}`;
+
+      // Montar Header
+      const headerData = {
+        TIPO_REGISTRO: 'A', COD_SERVICO: '1', CONVENIO: empresa.codigoConvenio, NOME_EMPRESA: empresa.nome,
+        COD_BANCO: empresa.banco, NOME_BANCO: empresa.nomeBanco, DATA_GERACAO: dataGeracaoFormatada, NSA: nsaCompleto,
+        VERSAO_LAYOUT: 'DEBITO AUTOMATICO', ID_SISTEMA: idSistema
+      };
+      const headerLine = buildLine('header', headerData);
+
+      // Montar Details (usando a lista de cobranças selecionadas)
+      let detailLines = [];
+      let totalValorCobrado = 0;
+
+      cobrancasParaProcessar.forEach((cobranca) => {
+        const cliente = clientes.find(cli => Number(cli.id) === Number(cobranca.clienteId));
+        if (!cliente) return;
+        totalValorCobrado += cobranca.valor;
+        const detailData = {
+          TIPO_REGISTRO: 'E', CODIGO_CLIENTE: cliente.codigo, DADOS_BANCARIOS: cliente.contaCorrente,
+          DATA_VENCIMENTO: cobranca.vencimento.replace(/-/g, ''), VALOR_DEBITO: cobranca.valor * 100,
+          COD_MOEDA: '3', BRANCOS: '', COD_OCORRENCIA: '0'
+        };
+        detailLines.push(buildLine('detail', detailData));
+      });
+
+      // Montar Trailer
+      const totalRegistros = cobrancasParaProcessar.length + 2; // Usa o tamanho da lista selecionada
+      const trailerData = {
+        TIPO_REGISTRO: 'Z', TOTAL_REGISTROS: totalRegistros, SOMA_VALORES: totalValorCobrado * 100, BRANCOS: ''
+      };
+      const trailerLine = buildLine('trailer', trailerData);
+
+      finalContent = [headerLine, ...detailLines, trailerLine].join('\n');
+
+      // --- DOWNLOAD DO ARQUIVO ---
+      const blob = new Blob([finalContent], { type: 'text/plain;charset=latin1' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `REMESSA_NSA_${novoNsaSequencial}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+    } catch (error) {
+      console.error("Erro na montagem do arquivo TXT:", error);
+      alert("Falha ao montar o arquivo de remessa. A operação foi cancelada.");
+      return;
+    }
+
+    // --- ATUALIZAÇÃO DO NSA (executa apenas se a geração acima for bem-sucedida) ---
+    try {
       const updatedConfigPayload = { ...config, ultimoNsaSequencial: novoNsaSequencial };
       const configUpdateUrl = `${API_CONFIG_URL}/${config.id}`;
       const updateResponse = await fetch(configUpdateUrl, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedConfigPayload)
       });
-      if (!updateResponse.ok) throw new Error('Falha ao atualizar NSA.');
-
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json();
+        throw new Error(errorData.message || 'Falha ao atualizar NSA no servidor.');
+      }
       setConfig(updatedConfigPayload);
       alert(`Arquivo de remessa com NSA ${novoNsaSequencial} gerado com sucesso!`);
     } catch (error) {
-      console.error("Erro ao gerar/atualizar remessa:", error);
-      alert(`ERRO: ${error.message}. Anote o NSA ${novoNsaSequencial}.`);
+      console.error("Erro ao atualizar NSA:", error);
+      alert(`ERRO CRÍTICO: O arquivo TXT foi gerado, mas não foi possível salvar o novo NSA (${novoNsaSequencial}). Anote este número para controle manual!`);
     }
   };
 
@@ -260,6 +431,11 @@ const CobrancasPage = () => {
         clientes={clientes}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        // Novas props adicionadas
+        selectedCobrancas={selectedCobrancas}
+        onSelectCobranca={handleSelectCobranca}
+        onSelectAll={handleSelectAll}
+        isAllSelected={cobrancasFiltradas.length > 0 && selectedCobrancas.size === cobrancasFiltradas.length}
       />
       <hr style={{ margin: '40px 0' }} />
       <ArquivosRemessa apiBaseUrl={API_BASE_URL} />

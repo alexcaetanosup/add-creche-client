@@ -267,3 +267,8 @@ button {
 .btn-download:hover {
   background-color: #117a65;
 }
+
+.row-selected {
+  background-color: #e8f4fd !important;
+  /* Azul claro para destacar a seleção */
+}
