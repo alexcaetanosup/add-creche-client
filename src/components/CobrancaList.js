@@ -1,20 +1,34 @@
 import React from 'react';
 
 const CobrancaList = ({
-    cobrancas,
-    clientes,
+    cobrancas = [],
+    clientes = [],
     onEdit,
     onDelete,
-    // Novas props para a seleção
-    selectedCobrancas,
-    onSelectCobranca,
-    onSelectAll,
-    isAllSelected
+    selectedCobrancas = new Set(),
+    onSelectCobranca = () => { },
+    onSelectAll = () => { },
+    isAllSelected = false
 }) => {
-    // ... (as funções formatCurrency, formatDate, getClienteName permanecem as mesmas) ...
-    const formatCurrency = (value) => { /* ... */ };
-    const formatDate = (dateString) => { /* ... */ };
-    const getClienteName = (clienteId) => { /* ... */ };
+
+    const formatCurrency = (value) => {
+        if (typeof value !== 'number') return 'R$ 0,00';
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return '--/--/----';
+        const date = new Date(dateString + 'T00:00:00');
+        return date.toLocaleDateString('pt-BR');
+    };
+
+    const getClienteName = (clienteId) => {
+        if (!clientes || clientes.length === 0 || !clienteId) {
+            return 'Cliente Desconhecido';
+        }
+        const cliente = clientes.find(c => Number(c.id) === Number(clienteId));
+        return cliente ? cliente.nome : 'Cliente Desconhecido';
+    };
 
     return (
         <table className="cobrancas-table">
@@ -26,6 +40,7 @@ const CobrancaList = ({
                             onChange={onSelectAll}
                             checked={isAllSelected}
                             title="Selecionar Todos"
+                            disabled={cobrancas.length === 0}
                         />
                     </th>
                     <th>Cliente</th>
