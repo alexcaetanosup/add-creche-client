@@ -6,6 +6,8 @@ import autoTable from 'jspdf-autotable';
 
 // Configuração das URLs da API
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+const API_URL = `${API_BASE_URL}/api/clientes`; // Para ClientesPage
+// E para CobrancasPage
 const API_CLIENTES_URL = `${API_BASE_URL}/api/clientes`;
 const API_COBRANCAS_URL = `${API_BASE_URL}/api/cobrancas`;
 const API_CONFIG_URL = `${API_BASE_URL}/api/config`;
@@ -26,7 +28,8 @@ const CobrancasPage = () => {
       const [cobrancasRes, clientesRes, configRes] = await Promise.all([
         fetch(API_COBRANCAS_URL),
         fetch(API_CLIENTES_URL),
-        fetch(API_CONFIG_URL)
+        fetch(API_CONFIG_URL),
+        fetch(API_URL)
       ]);
       const cobrancasData = await cobrancasRes.json();
       const clientesData = await clientesRes.json();
