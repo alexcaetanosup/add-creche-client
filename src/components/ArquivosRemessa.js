@@ -1,42 +1,35 @@
 import React, { useState, useEffect } from 'react';
 
-// A URL base da API será passada como prop
 const ArquivosRemessa = ({ apiBaseUrl }) => {
     const [arquivos, setArquivos] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Em ArquivosRemessa.js
-
     useEffect(() => {
         const fetchArquivos = async () => {
+            setLoading(true); // Garante que o loading comece ao buscar
             try {
                 const response = await fetch(`${apiBaseUrl}/api/listar-arquivos`);
-
-                // Verifica se a resposta da API foi bem-sucedida
-                if (!response.ok) {
-                    // Se não foi, lança um erro para ser pego pelo catch
-                    throw new Error('Falha ao buscar a lista de arquivos.');
-                }
-
+                if (!response.ok) throw new Error('Falha ao buscar a lista de arquivos.');
                 const data = await response.json();
-
-                // Garante que estamos sempre salvando um array no estado
                 if (Array.isArray(data)) {
                     setArquivos(data);
                 } else {
-                    setArquivos([]); // Se a resposta não for um array, define como array vazio
+                    setArquivos([]);
                 }
-
             } catch (error) {
                 console.error("Erro ao buscar lista de arquivos:", error);
-                setArquivos([]); // Em caso de erro, garante que 'arquivos' seja um array vazio
+                setArquivos([]);
             } finally {
-                setLoading(false);
+                setLoading(false); // Para o loading no final, com sucesso ou erro
             }
         };
-
         fetchArquivos();
     }, [apiBaseUrl]);
+
+    // ADICIONE ESTE BLOCO DE CÓDIGO AQUI
+    if (loading) {
+        return <p>Carregando lista de arquivos arquivados...</p>;
+    }
 
     return (
         <div className="arquivos-container">
@@ -51,7 +44,7 @@ const ArquivosRemessa = ({ apiBaseUrl }) => {
                             <a
                                 href={`${apiBaseUrl}/api/download-arquivo/${nomeArquivo}`}
                                 className="btn-download"
-                                download // O atributo 'download' sugere ao navegador para baixar em vez de navegar
+                                download
                             >
                                 Baixar
                             </a>
