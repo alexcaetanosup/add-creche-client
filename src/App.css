@@ -213,6 +213,57 @@ button {
 }
 
 .row-selected {
-    background-color: #e8f4fd !important; /* Cor de fundo azul claro */
-    font-weight: bold;
+  background-color: #e8f4fd !important;
+  /* Cor de fundo azul claro */
+  font-weight: bold;
+}
+
+/* Estilos para a lista de arquivos de remessa */
+.arquivos-container {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+.arquivos-container h2 {
+  margin-top: 0;
+  color: #34495e;
+}
+
+.arquivos-container ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.arquivos-container li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+.arquivos-container li:last-child {
+  border-bottom: none;
+}
+
+.arquivos-container span {
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.btn-download {
+  padding: 5px 12px;
+  background-color: #16a085;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  transition: background-color 0.2s;
+}
+
+.btn-download:hover {
+  background-color: #117a65;
 }

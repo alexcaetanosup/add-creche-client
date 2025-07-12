@@ -3,6 +3,7 @@ import CobrancaList from '../components/CobrancaList.js';
 import CobrancaForm from '../components/CobrancaForm.js';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import ArquivosRemessa from '../components/ArquivosRemessa.js';
 
 // Configuração das URLs da API
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
@@ -260,6 +261,8 @@ const CobrancasPage = () => {
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
+      <hr style={{ margin: '40px 0' }} />
+      <ArquivosRemessa apiBaseUrl={API_BASE_URL} />
     </div>
   );
 };
