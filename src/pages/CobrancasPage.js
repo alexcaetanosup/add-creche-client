@@ -31,6 +31,10 @@ const CobrancasPage = () => {
         fetch(API_CLIENTES_URL),
         fetch(API_CONFIG_URL)
       ]);
+      // Verificação de segurança para cada resposta
+      if (!cobrancasRes.ok || !clientesRes.ok || !configRes.ok) {
+        throw new Error('Falha ao buscar um ou mais recursos da API.');
+      }
       const cobrancasData = await cobrancasRes.json();
       const clientesData = await clientesRes.json();
       const configData = await configRes.json();
@@ -38,7 +42,6 @@ const CobrancasPage = () => {
       setCobrancas(Array.isArray(cobrancasData) ? cobrancasData : []);
       setClientes(Array.isArray(clientesData) ? clientesData : []);
       setConfig(configData || null);
-
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
       setCobrancas([]);
@@ -57,37 +60,31 @@ const CobrancasPage = () => {
   const cobrancasFiltradas = cobrancas.filter(c => {
     const remessaPendente = c.statusRemessa === 'pendente';
     if (!remessaPendente) return false;
-
     const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
     if (!cliente) return false;
-
     const filtroAtivo = filtro.trim().toLowerCase();
     return filtroAtivo === '' || cliente.nome.toLowerCase().includes(filtroAtivo);
   });
 
   // --- FUNÇÕES DE SELEÇÃO ---
   const handleSelectCobranca = (cobrancaId) => {
-    setSelectedCobrancas(prevSelected => {
-      const newSelected = new Set(prevSelected);
-      if (newSelected.has(cobrancaId)) {
-        newSelected.delete(cobrancaId);
-      } else {
-        newSelected.add(cobrancaId);
-      }
+    setSelectedCobrancas(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(cobrancaId)) newSelected.delete(cobrancaId);
+      else newSelected.add(cobrancaId);
       return newSelected;
     });
   };
 
   const handleSelectAll = () => {
-    if (selectedCobrancas.size === cobrancasFiltradas.length) {
+    if (cobrancasFiltradas.length > 0 && selectedCobrancas.size === cobrancasFiltradas.length) {
       setSelectedCobrancas(new Set());
     } else {
-      const allIds = new Set(cobrancasFiltradas.map(c => c.id));
-      setSelectedCobrancas(allIds);
+      setSelectedCobrancas(new Set(cobrancasFiltradas.map(c => c.id)));
     }
   };
 
-  // --- FUNÇÕES DE CRUD ---
+  // --- FUNÇÕES DE CRUD (COMPLETAS) ---
   const handleSave = async (cobranca) => {
     if (!cobranca.clienteId) {
       alert("ERRO: Por favor, selecione um cliente.");
@@ -95,6 +92,7 @@ const CobrancasPage = () => {
     }
     const method = cobranca.id ? 'PUT' : 'POST';
     const url = cobranca.id ? `${API_COBRANCAS_URL}/${cobranca.id}` : API_COBRANCAS_URL;
+
     const payload = { ...cobranca, clienteId: Number(cobranca.clienteId), valor: Number(cobranca.valor) };
     if (!payload.statusRemessa) {
       payload.statusRemessa = 'pendente';
@@ -121,10 +119,12 @@ const CobrancasPage = () => {
   const handleDelete = async (id) => {
     if (window.confirm('Tem certeza que deseja deletar esta cobrança?')) {
       try {
-        await fetch(`${API_COBRANCAS_URL}/${id}`, { method: 'DELETE' });
+        const response = await fetch(`${API_COBRANCAS_URL}/${id}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Falha ao deletar cobrança.');
         fetchData();
       } catch (error) {
         console.error("Erro ao deletar cobrança:", error);
+        alert(`Ocorreu um erro: ${error.message}`);
       }
     }
   };
@@ -134,7 +134,7 @@ const CobrancasPage = () => {
     setIsFormVisible(true);
   };
 
-  // --- FUNÇÕES DE REMESSA ---
+  // --- FUNÇÕES DE REMESSA (COMPLETAS) ---
   const handleFinalizarRemessa = async () => {
     const cobrancasParaFinalizar = cobrancas.filter(c => selectedCobrancas.has(c.id));
     if (cobrancasParaFinalizar.length === 0) {
@@ -166,6 +166,7 @@ const CobrancasPage = () => {
     }
   };
 
+  // --- FUNÇÕES DE GERAÇÃO DE RELATÓRIOS (INCLUÍDAS) ---
   const gerarPDF = () => {
     const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
     if (cobrancasParaProcessar.length === 0) {
@@ -190,6 +191,8 @@ const CobrancasPage = () => {
     });
     doc.save('relatorio_cobrancas.pdf');
   };
+
+  // Substitua sua função gerarTXT por esta, dentro de CobrancasPage.js
 
   const gerarTXT = async () => {
     const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
@@ -260,33 +263,49 @@ const CobrancasPage = () => {
       const parteFixa = config.parteFixaNsa || '04';
       const nsaCompleto = `${String(novoNsaSequencial).padStart(6, '0')}${parteFixa}`;
 
+      // --- CÓDIGO CORRIGIDO ---
       const headerData = {
-        TIPO_REGISTRO: 'A', COD_SERVICO: '1', CONVENIO: empresa.codigoConvenio, NOME_EMPRESA: empresa.nome,
-        COD_BANCO: empresa.banco, NOME_BANCO: empresa.nomeBanco, DATA_GERACAO: dataGeracaoFormatada, NSA: nsaCompleto,
-        VERSAO_LAYOUT: 'DEBITO AUTOMATICO', ID_SISTEMA: idSistema
+        TIPO_REGISTRO: 'A',
+        COD_SERVICO: '1',
+        CONVENIO: empresa.codigoConvenio,
+        NOME_EMPRESA: empresa.nome,
+        COD_BANCO: empresa.banco,
+        NOME_BANCO: empresa.nomeBanco,
+        DATA_GERACAO: dataGeracaoFormatada,
+        NSA: nsaCompleto,
+        VERSAO_LAYOUT: 'DEBITO AUTOMATICO',
+        ID_SISTEMA: idSistema
       };
       const headerLine = buildLine('header', headerData);
 
       let detailLines = [];
       let totalValorCobrado = 0;
-
       cobrancasParaProcessar.forEach((cobranca) => {
         const cliente = clientes.find(cli => Number(cli.id) === Number(cobranca.clienteId));
         if (!cliente) return;
         totalValorCobrado += cobranca.valor;
         const detailData = {
-          TIPO_REGISTRO: 'E', CODIGO_CLIENTE: cliente.codigo, DADOS_BANCARIOS: cliente.contaCorrente,
-          DATA_VENCIMENTO: cobranca.vencimento.replace(/-/g, ''), VALOR_DEBITO: cobranca.valor * 100,
-          COD_MOEDA: '3', BRANCOS: '', COD_OCORRENCIA: '0'
+          TIPO_REGISTRO: 'E',
+          CODIGO_CLIENTE: cliente.codigo,
+          DADOS_BANCARIOS: cliente.contaCorrente,
+          DATA_VENCIMENTO: cobranca.vencimento.replace(/-/g, ''),
+          VALOR_DEBITO: cobranca.valor * 100,
+          COD_MOEDA: '3',
+          BRANCOS: '',
+          COD_OCORRENCIA: '0'
         };
         detailLines.push(buildLine('detail', detailData));
       });
 
       const totalRegistros = cobrancasParaProcessar.length + 2;
       const trailerData = {
-        TIPO_REGISTRO: 'Z', TOTAL_REGISTROS: totalRegistros, SOMA_VALORES: totalValorCobrado * 100, BRANCOS: ''
+        TIPO_REGISTRO: 'Z',
+        TOTAL_REGISTROS: totalRegistros,
+        SOMA_VALORES: totalValorCobrado * 100,
+        BRANCOS: ''
       };
       const trailerLine = buildLine('trailer', trailerData);
+      // --- FIM DO CÓDIGO CORRIGIDO ---
 
       finalContent = [headerLine, ...detailLines, trailerLine].join('\n');
 
@@ -319,54 +338,39 @@ const CobrancasPage = () => {
     }
   };
 
+  // --- RENDERIZAÇÃO CONDICIONAL PRINCIPAL ---
+  if (isLoading) {
+    return <p>Carregando dados do sistema...</p>;
+  }
+
   // --- RENDERIZAÇÃO DO COMPONENTE ---
   return (
     <div>
       <h1>Gerenciamento de Cobranças</h1>
       <div className="action-bar">
         <div className="search-bar">
-          <input
-            type="text"
-            id="filtro-cobranca"
-            name="filtro-cobranca"
-            placeholder="Filtrar por nome do cliente..."
-            value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
-          />
+          <input type="text" id="filtro-cobranca" name="filtro-cobranca" placeholder="Filtrar por nome do cliente..." value={filtro} onChange={(e) => setFiltro(e.target.value)} />
         </div>
         <div className="button-group">
-          {!isFormVisible && (
-            <button onClick={() => setIsFormVisible(true)} className="btn-primary">Nova Cobrança</button>
-          )}
+          {!isFormVisible && (<button onClick={() => setIsFormVisible(true)} className="btn-primary">Nova Cobrança</button>)}
           <button onClick={gerarPDF} className="btn-secondary">Gerar PDF</button>
           <button onClick={gerarTXT} className="btn-tertiary">Gerar TXT</button>
           <button onClick={handleFinalizarRemessa} className="btn-archive">Finalizar Remessa</button>
         </div>
       </div>
 
-      {isFormVisible && (
-        <CobrancaForm
-          onSave={handleSave}
-          cobrancaAtual={cobrancaAtual}
-          clientes={clientes}
-          onCancel={() => { setIsFormVisible(false); setCobrancaAtual(null); }}
-        />
-      )}
+      {isFormVisible && <CobrancaForm onSave={handleSave} cobrancaAtual={cobrancaAtual} clientes={clientes} onCancel={() => { setIsFormVisible(false); setCobrancaAtual(null); }} />}
 
-      {isLoading ? (
-        <p>Carregando cobranças...</p>
-      ) : (
-        <CobrancaList
-          cobrancas={cobrancasFiltradas}
-          clientes={clientes}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          selectedCobrancas={selectedCobrancas}
-          onSelectCobranca={handleSelectCobranca}
-          onSelectAll={handleSelectAll}
-          isAllSelected={cobrancasFiltradas.length > 0 && selectedCobrancas.size === cobrancasFiltradas.length}
-        />
-      )}
+      <CobrancaList
+        cobrancas={cobrancasFiltradas}
+        clientes={clientes}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        selectedCobrancas={selectedCobrancas}
+        onSelectCobranca={handleSelectCobranca}
+        onSelectAll={handleSelectAll}
+        isAllSelected={cobrancasFiltradas.length > 0 && selectedCobrancas.size === cobrancasFiltradas.length}
+      />
 
       <hr style={{ margin: '40px 0' }} />
       <ArquivosRemessa apiBaseUrl={API_BASE_URL} />

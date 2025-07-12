@@ -23,6 +23,7 @@ const CobrancaList = ({
     };
 
     const getClienteName = (clienteId) => {
+        // A verificação crucial acontece aqui. Se 'clientes' for undefined, não vai quebrar.
         if (!clientes || clientes.length === 0 || !clienteId) {
             return 'Cliente Desconhecido';
         }
