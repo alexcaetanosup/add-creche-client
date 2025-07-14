@@ -58,15 +58,19 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
     }
   }, [clientePreSelecionado]);
 
-  // --- LÓGICA DE FILTRAGEM COM useMemo ---
+  // --- LÓGICA DE FILTRAGEM COM useMemo (CORRIGIDA) ---
   const cobrancasFiltradas = useMemo(() => {
-    if (!Array.isArray(clientes) || !Array.isArray(cobrancas)) return [];
+    if (!Array.isArray(clientes) || !Array.isArray(cobrancas)) {
+      return [];
+    }
     return cobrancas.filter(c => {
       if (c.statusRemessa !== 'pendente') return false;
+
       const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
       if (!cliente) return false;
+
       const filtroAtivo = filtro.trim().toLowerCase();
-      return filtroAtivo === '' || cliente.nome.toLowerCase().includes(filtroAtivo);
+      return (filtroAtivo === '' || cliente.nome.toLowerCase().includes(filtroAtivo));
     });
   }, [cobrancas, clientes, filtro]);
 
@@ -138,31 +142,7 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
     setIsFormVisible(true);
   };
 
-  // --- FUNÇÕES DE GERAÇÃO DE RELATÓRIOS E REMESSA ---
-  const gerarPDF = () => {
-    const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
-    if (cobrancasParaProcessar.length === 0) {
-      alert("Nenhuma cobrança selecionada para gerar o PDF.");
-      return;
-    }
-    const doc = new jsPDF();
-    doc.text("Relatório de Cobranças Selecionadas", 14, 16);
-    autoTable(doc, {
-      head: [['Cliente', 'Descrição', 'Valor', 'Vencimento', 'Status']],
-      body: cobrancasParaProcessar.map(c => {
-        const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
-        return [
-          cliente ? cliente.nome : 'N/A',
-          c.descricao,
-          new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.valor),
-          new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR'),
-          c.status
-        ];
-      }), startY: 20,
-    });
-    doc.save('relatorio_cobrancas.pdf');
-  };
-
+  // --- FUNÇÃO UNIFICADA DE GERAÇÃO E ARQUIVAMENTO DE REMESSA ---
   const gerarTXT = async () => {
     const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
     if (cobrancasParaProcessar.length === 0) {
@@ -236,6 +216,7 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+
     } catch (error) {
       console.error("Erro na montagem do arquivo TXT:", error);
       alert("Falha ao montar o arquivo de remessa. A operação foi cancelada.");
@@ -268,6 +249,30 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
       console.error("Erro na etapa de pós-geração:", error);
       alert(`ERRO CRÍTICO: O arquivo TXT foi gerado, mas ocorreu um erro ao atualizar os dados no servidor (${error.message}). Anote o NSA ${novoNsaSequencial} e verifique os dados manualmente.`);
     }
+  };
+
+  const gerarPDF = () => {
+    const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
+    if (cobrancasParaProcessar.length === 0) {
+      alert("Nenhuma cobrança selecionada para gerar o PDF.");
+      return;
+    }
+    const doc = new jsPDF();
+    doc.text("Relatório de Cobranças Selecionadas", 14, 16);
+    autoTable(doc, {
+      head: [['Cliente', 'Descrição', 'Valor', 'Vencimento', 'Status']],
+      body: cobrancasParaProcessar.map(c => {
+        const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
+        return [
+          cliente ? cliente.nome : 'N/A',
+          c.descricao,
+          new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.valor),
+          new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR'),
+          c.status
+        ];
+      }), startY: 20,
+    });
+    doc.save('relatorio_cobrancas.pdf');
   };
 
   if (isLoading) {
