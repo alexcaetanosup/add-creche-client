@@ -273,7 +273,7 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
   if (isLoading) {
     return (
       <div className="App">
-        <h1>Aplicatico de Cobrança</h1>
+        <h1>Aplicativo de Cobrança</h1>
         <h2>Gerenciamento de Cobranças</h2>
         <p>Carregando dados do sistema...</p>
       </div>
@@ -282,7 +282,8 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
 
   return (
     <div>
-      <h1>Gerenciamento de Cobranças</h1>
+      <h1>Aplicativo de Cobrança</h1>
+      <h2>Gerenciamento de Cobranças</h2>
       <div className="action-bar">
         <div className="search-bar">
           <input type="text" id="filtro-cobranca" name="filtro-cobranca" placeholder="Filtrar por nome do cliente..." value={filtro} onChange={(e) => setFiltro(e.target.value)} />
