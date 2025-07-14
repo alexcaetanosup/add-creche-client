@@ -1,0 +1,65 @@
+.sobre-container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 30px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    text-align: center;
+}
+
+.sobre-container h1 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+.sobre-descricao {
+    font-size: 1.1em;
+    color: #7f8c8d;
+    line-height: 1.6;
+    margin-bottom: 40px;
+}
+
+.contato-info {
+    text-align: left;
+    border-top: 1px solid #ecf0f1;
+    padding-top: 20px;
+}
+
+.contato-info h2 {
+    text-align: center;
+    color: #34495e;
+    margin-bottom: 25px;
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+    font-size: 1em;
+}
+
+.info-item strong {
+    color: #2c3e50;
+    min-width: 150px;
+    /* Alinha os valores */
+}
+
+.info-item a {
+    color: #3498db;
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.info-item a:hover {
+    color: #2980b9;
+    text-decoration: underline;
+}
+
+.info-versao {
+    margin-top: 40px;
+    padding-top: 15px;
+    border-top: 1px solid #ecf0f1;
+    font-size: 0.9em;
+    color: #95a5a6;
+}

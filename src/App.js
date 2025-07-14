@@ -1,23 +1,20 @@
-// Substitua todo o conteúdo de src/App.js por este código
 import React, { useState } from 'react';
 import ClientesPage from './pages/ClientesPage.js';
 import CobrancasPage from './pages/CobrancasPage.js';
+import SobrePage from './pages/SobrePage.js'; // <-- Importado
 import './App.css';
 
 function App() {
-  const [view, setView] = useState('clientes'); // A tela inicial agora é a de clientes
+  const [view, setView] = useState('clientes'); // A tela inicial pode ser clientes
   const [clienteParaCobranca, setClienteParaCobranca] = useState(null);
 
-  // Função que é chamada pela ClientesPage para trocar de tela
   const handleLancarCobrancaParaCliente = (cliente) => {
-    setClienteParaCobranca(cliente); // Guarda o cliente que foi selecionado
-    setView('cobrancas'); // Muda para a tela de cobranças
+    setClienteParaCobranca(cliente);
+    setView('cobrancas');
   };
 
-  // Função para a navegação principal
   const handleNavigate = (targetView) => {
     setView(targetView);
-    // Limpa o cliente pré-selecionado para não interferir
     setClienteParaCobranca(null);
   }
 
@@ -36,17 +33,24 @@ function App() {
         >
           Gerenciar Cobranças
         </button>
-        <h1>Aplicativo de Cobrança</h1>
+        {/* NOVO BOTÃO DE NAVEGAÇÃO */}
+        <button
+          onClick={() => handleNavigate('sobre')}
+          className={view === 'sobre' ? 'active' : ''}
+        >
+          Sobre
+        </button>
       </nav>
       <main>
+        {/* LÓGICA DE RENDERIZAÇÃO ATUALIZADA */}
         {view === 'clientes' && <ClientesPage onLancarCobranca={handleLancarCobrancaParaCliente} />}
         {view === 'cobrancas' && <CobrancasPage clientePreSelecionado={clienteParaCobranca} />}
+        {view === 'sobre' && <SobrePage />}
       </main>
     </div>
   );
 }
 
 export default App;
-
 
 
