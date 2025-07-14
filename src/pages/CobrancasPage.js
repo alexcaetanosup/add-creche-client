@@ -230,7 +230,8 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
       const blob = new Blob([finalContent], { type: 'text/plain;charset=latin1' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `REMESSA_NSA_${novoNsaSequencial}.txt`;
+      // link.download = `REMESSA_NSA_${novoNsaSequencial}.txt`;
+      link.download = `REMESSA_NSA_${novoNsaSequencial}.rem`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
