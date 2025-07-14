@@ -1,40 +1,42 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 const CobrancaForm = ({
     onSave,
     onCancel,
     clientes = [],
     cobrancaAtual,
-    clientePreSelecionado // Nova prop
+    clientePreSelecionado
 }) => {
 
     const getTodayDate = () => new Date().toISOString().split('T')[0];
 
-    const getInitialState = () => ({
-        // Se houver um cliente pré-selecionado, use o ID dele.
+    // Usamos useCallback para que a função não seja recriada em toda renderização.
+    // Ela depende de 'clientePreSelecionado' para definir o estado inicial corretamente.
+    const getInitialState = useCallback(() => ({
         clienteId: clientePreSelecionado ? clientePreSelecionado.id : '',
         descricao: 'Colaboração Espontânea',
         valor: '',
         vencimento: getTodayDate(),
-        status: 'Pendente'
-    });
+        status: 'Pendente',
+        statusRemessa: 'pendente' // Garante que o campo sempre exista
+    }), [clientePreSelecionado]);
 
     const [cobranca, setCobranca] = useState(getInitialState());
 
+    // Este useEffect agora lida com as mudanças nas props de forma limpa.
     useEffect(() => {
-        // Lógica para edição de uma cobrança existente
         if (cobrancaAtual) {
+            // Modo de Edição: preenche com os dados da cobrança existente.
             setCobranca({
                 ...cobrancaAtual,
                 clienteId: String(cobrancaAtual.clienteId || ''),
                 valor: String(cobrancaAtual.valor || ''),
             });
-        }
-        // Lógica para nova cobrança (com ou sem cliente pré-selecionado)
-        else {
+        } else {
+            // Modo de Criação: reseta para o estado inicial (que já sabe sobre o cliente pré-selecionado).
             setCobranca(getInitialState());
         }
-    }, [cobrancaAtual, clientePreSelecionado]); // Adiciona clientePreSelecionado como dependência
+    }, [cobrancaAtual, clientePreSelecionado, getInitialState]); // Adiciona getInitialState ao array de dependências.
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -48,7 +50,7 @@ const CobrancaForm = ({
 
     return (
         <div className="form-container">
-            <h2>{cobrancaAtual ? 'Editar Cobrança' : 'Adicionar Nova Cobrança'}</h2>
+            <h2>{cobrancaAtual ? 'Editar Cobrança' : (clientePreSelecionado ? `Nova Cobrança para ${clientePreSelecionado.nome}` : 'Adicionar Nova Cobrança')}</h2>
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
                     <label htmlFor="clienteId">Cliente</label>
@@ -58,11 +60,15 @@ const CobrancaForm = ({
                         value={cobranca.clienteId}
                         onChange={handleChange}
                         required
-                        disabled={!!clientePreSelecionado} // Desabilita o campo se um cliente foi pré-selecionado
+                        disabled={!!clientePreSelecionado || !!cobrancaAtual} // Desabilita na pré-seleção E na edição
                     >
-                        {/* Se um cliente foi pré-selecionado, mostra apenas ele */}
                         {clientePreSelecionado ? (
                             <option value={clientePreSelecionado.id}>{clientePreSelecionado.nome}</option>
+                        ) : cobrancaAtual ? (
+                            // Na edição, encontra o cliente para mostrar o nome
+                            <option value={cobrancaAtual.clienteId}>
+                                {clientes.find(c => c.id === cobrancaAtual.clienteId)?.nome || 'Carregando...'}
+                            </option>
                         ) : (
                             <>
                                 <option value="" disabled>Selecione um cliente</option>
@@ -74,7 +80,6 @@ const CobrancaForm = ({
                     </select>
                 </div>
 
-                {/* O resto do formulário permanece igual */}
                 <div className="form-group">
                     <label htmlFor="descricao">Descrição</label>
                     <input type="text" id="descricao" name="descricao" value={cobranca.descricao} onChange={handleChange} required />
