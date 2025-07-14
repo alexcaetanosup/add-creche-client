@@ -272,3 +272,42 @@ button {
   background-color: #e8f4fd !important;
   /* Azul claro para destacar a seleção */
 }
+
+/* Adicione no final de src/App.css */
+
+.btn-gerar-cobranca {
+  background-color: #16a085;
+  /* Verde azulado */
+  color: white;
+}
+
+.btn-gerar-cobranca:hover {
+  background-color: #117a65;
+}
+
+.row-selected {
+  background-color: #e8f4fd !important;
+  /* Azul claro para destacar */
+  font-weight: bold;
+}
+
+/* Adicione no final de src/App.css */
+.btn-lancar-cobranca {
+  background-color: #f39c12;
+  /* Laranja */
+  color: white;
+}
+
+.btn-lancar-cobranca:hover {
+  background-color: #e67e22;
+}
+
+.btn-lancar-cobranca {
+  background-color: #f39c12;
+  /* Laranja */
+  color: white;
+}
+
+.btn-lancar-cobranca:hover {
+  background-color: #e67e22;
+}

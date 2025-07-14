@@ -11,7 +11,7 @@ const API_CLIENTES_URL = `${API_BASE_URL}/api/clientes`;
 const API_COBRANCAS_URL = `${API_BASE_URL}/api/cobrancas`;
 const API_CONFIG_URL = `${API_BASE_URL}/api/config`;
 
-const CobrancasPage = () => {
+const CobrancasPage = ({ clientePreSelecionado }) => {
   // --- ESTADOS DO COMPONENTE ---
   const [cobrancas, setCobrancas] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -29,8 +29,8 @@ const CobrancasPage = () => {
       const responses = await Promise.all([
         fetch(API_COBRANCAS_URL), fetch(API_CLIENTES_URL), fetch(API_CONFIG_URL)
       ]);
-      for (const response of responses) {
-        if (!response.ok) throw new Error(`Falha na API: ${response.url} respondeu com status ${response.status}`);
+      for (const res of responses) {
+        if (!res.ok) throw new Error(`Falha na API: ${res.url} respondeu com status ${res.status}`);
       }
       const [cobrancasData, clientesData, configData] = await Promise.all(responses.map(r => r.json()));
       setCobrancas(Array.isArray(cobrancasData) ? cobrancasData : []);
@@ -48,6 +48,13 @@ const CobrancasPage = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (clientePreSelecionado) {
+      setIsFormVisible(true);
+      setCobrancaAtual(null);
+    }
+  }, [clientePreSelecionado]);
 
   // --- LÓGICA DE FILTRAGEM COM useMemo ---
   const cobrancasFiltradas = useMemo(() => {
@@ -129,38 +136,7 @@ const CobrancasPage = () => {
     setIsFormVisible(true);
   };
 
-  // --- FUNÇÕES DE REMESSA ---
-  const handleFinalizarRemessa = async () => {
-    const cobrancasParaFinalizar = cobrancas.filter(c => selectedCobrancas.has(c.id));
-    if (cobrancasParaFinalizar.length === 0) {
-      alert("Nenhuma cobrança selecionada para finalizar.");
-      return;
-    }
-    const hoje = new Date();
-    const mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-    const nomeArquivo = `${mesAtual.getFullYear()}_${String(mesAtual.getMonth() + 1).padStart(2, '0')}`;
-
-    if (window.confirm(`Confirma o arquivamento de ${cobrancasParaFinalizar.length} cobrança(s) para "remessa_${nomeArquivo}.json"?`)) {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/arquivar-remessa`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cobrancasParaArquivar: cobrancasParaFinalizar, mesAno: nomeArquivo }),
-        });
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Falha ao arquivar a remessa.');
-        }
-        alert("Remessa finalizada e arquivada com sucesso!");
-        setSelectedCobrancas(new Set());
-        fetchData();
-      } catch (error) {
-        console.error("Erro ao finalizar e arquivar remessa:", error);
-        alert(`Ocorreu um erro: ${error.message}`);
-      }
-    }
-  };
-
+  // --- FUNÇÕES DE RELATÓRIO E REMESSA ---
   const gerarPDF = () => {
     const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
     if (cobrancasParaProcessar.length === 0) {
@@ -180,8 +156,7 @@ const CobrancasPage = () => {
           new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR'),
           c.status
         ];
-      }),
-      startY: 20,
+      }), startY: 20,
     });
     doc.save('relatorio_cobrancas.pdf');
   };
@@ -198,10 +173,14 @@ const CobrancasPage = () => {
     }
 
     const novoNsaSequencial = config.ultimoNsaSequencial + 1;
-    const confirmacao = window.confirm(`Será gerado um arquivo de remessa com ${cobrancasParaProcessar.length} cobrança(s).\nNovo NSA: ${novoNsaSequencial}\n\nConfirmar?`);
+    const confirmacao = window.confirm(
+      `Será gerado um arquivo de remessa com ${cobrancasParaProcessar.length} cobrança(s).\n` +
+      `Novo NSA: ${novoNsaSequencial}\n\n` +
+      `Após a geração, estas cobranças serão arquivadas e removidas da lista. Continuar?`
+    );
     if (!confirmacao) return;
 
-    let finalContent = '';
+    // --- Etapa 1: Geração do Arquivo .TXT ---
     try {
       const formatText = (text = '', length) => String(text).substring(0, length).padEnd(length, ' ');
       const formatNumber = (num = 0, length) => String(num).replace(/[^0-9]/g, '').padStart(length, '0');
@@ -246,7 +225,7 @@ const CobrancasPage = () => {
       const trailerData = { TIPO_REGISTRO: 'Z', TOTAL_REGISTROS: totalRegistros, SOMA_VALORES: totalValorCobrado * 100, BRANCOS: '' };
       const trailerLine = buildLine('trailer', trailerData);
 
-      finalContent = [headerLine, ...detailLines, trailerLine].join('\n');
+      const finalContent = [headerLine, ...detailLines, trailerLine].join('\n');
 
       const blob = new Blob([finalContent], { type: 'text/plain;charset=latin1' });
       const link = document.createElement('a');
@@ -258,52 +237,66 @@ const CobrancasPage = () => {
 
     } catch (error) {
       console.error("Erro na montagem do arquivo TXT:", error);
-      alert("Falha ao montar o arquivo de remessa. A operação foi cancelada.");
-      return;
+      alert("Falha ao montar o arquivo de remessa. A operação foi cancelada e os dados NÃO foram arquivados.");
+      return; // Interrompe tudo se a geração do TXT falhar
     }
 
+    // --- Etapa 2: Atualização do NSA e Arquivamento ---
     try {
+      // Atualiza o NSA
       const updatedConfigPayload = { ...config, ultimoNsaSequencial: novoNsaSequencial };
       const configUpdateUrl = `${API_CONFIG_URL}/${config.id}`;
-      const updateResponse = await fetch(configUpdateUrl, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedConfigPayload)
+      const updateNsaResponse = await fetch(configUpdateUrl, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedConfigPayload) });
+      if (!updateNsaResponse.ok) throw new Error('Falha ao atualizar o NSA no servidor.');
+
+      // Arquiva a remessa
+      const hoje = new Date();
+      const mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      const nomeArquivo = `${mesAtual.getFullYear()}_${String(mesAtual.getMonth() + 1).padStart(2, '0')}`;
+      const archiveResponse = await fetch(`${API_BASE_URL}/api/arquivar-remessa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cobrancasParaArquivar: cobrancasParaProcessar, mesAno: nomeArquivo }),
       });
-      if (!updateResponse.ok) throw new Error('Falha ao atualizar NSA no servidor.');
-      setConfig(updatedConfigPayload);
-      alert(`Arquivo de remessa com NSA ${novoNsaSequencial} gerado com sucesso!`);
+      if (!archiveResponse.ok) throw new Error('Falha ao arquivar a remessa no servidor.');
+
+      alert(`Remessa (NSA ${novoNsaSequencial}) gerada e arquivada com sucesso!`);
+      setSelectedCobrancas(new Set());
+      fetchData();
+
     } catch (error) {
-      console.error("Erro ao atualizar NSA:", error);
-      alert(`ERRO CRÍTICO: O arquivo TXT foi gerado, mas não foi possível salvar o novo NSA (${novoNsaSequencial}). Anote este número!`);
+      console.error("Erro na etapa de pós-geração:", error);
+      alert(`ERRO CRÍTICO: O arquivo TXT foi gerado, mas ocorreu um erro ao atualizar os dados no servidor (${error.message}). Anote o NSA ${novoNsaSequencial} e verifique os dados manualmente.`);
     }
   };
 
-  // --- RENDERIZAÇÃO CONDICIONAL PRINCIPAL ---
   if (isLoading) {
-    return (
-      <div className="App">
-        <h1>Gerenciamento de Cobranças</h1>
-        <p>Carregando dados do sistema...</p>
-      </div>
-    );
+    return <div className="App"><h1>Gerenciamento de Cobranças</h1><p>Carregando...</p></div>;
   }
 
-  // --- RENDERIZAÇÃO DO COMPONENTE ---
   return (
     <div>
       <h1>Gerenciamento de Cobranças</h1>
       <div className="action-bar">
         <div className="search-bar">
-          <input type="text" id="filtro-cobranca" name="filtro-cobranca" placeholder="Filtrar por nome do cliente..." value={filtro} onChange={(e) => setFiltro(e.target.value)} />
+          <input type="text" id="filtro-cobranca" name="filtro-cobranca" placeholder="Filtrar por nome..." value={filtro} onChange={(e) => setFiltro(e.target.value)} />
         </div>
         <div className="button-group">
-          {!isFormVisible && (<button onClick={() => setIsFormVisible(true)} className="btn-primary">Nova Cobrança</button>)}
+          {!isFormVisible && (<button onClick={() => { setIsFormVisible(true); setCobrancaAtual(null); }} className="btn-primary">Nova Cobrança</button>)}
           <button onClick={gerarPDF} className="btn-secondary">Gerar PDF</button>
-          <button onClick={gerarTXT} className="btn-tertiary">Gerar TXT</button>
-          <button onClick={handleFinalizarRemessa} className="btn-archive">Finalizar Remessa</button>
+          <button onClick={gerarTXT} className="btn-tertiary">Gerar TXT e Arquivar</button>
         </div>
       </div>
 
-      {isFormVisible && <CobrancaForm onSave={handleSave} cobrancaAtual={cobrancaAtual} clientes={clientes} onCancel={() => { setIsFormVisible(false); setCobrancaAtual(null); }} />}
+      {isFormVisible && (
+        <CobrancaForm
+          onSave={handleSave}
+          cobrancaAtual={cobrancaAtual}
+          clientes={clientes}
+          clientePreSelecionado={clientePreSelecionado}
+          onCancel={() => { setIsFormVisible(false); setCobrancaAtual(null); }}
+        />
+      )}
 
       <CobrancaList
         cobrancas={cobrancasFiltradas}
