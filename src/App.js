@@ -36,8 +36,8 @@ function App() {
         >
           Gerenciar Cobranças
         </button>
+        <h1>Aplicativo de Cobrança</h1>
       </nav>
-      <h1>Aplicativo de Cobrança</h1>
       <main>
         {view === 'clientes' && <ClientesPage onLancarCobranca={handleLancarCobrancaParaCliente} />}
         {view === 'cobrancas' && <CobrancasPage clientePreSelecionado={clienteParaCobranca} />}
