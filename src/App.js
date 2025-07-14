@@ -1,84 +1,44 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from './supabaseClient'; // Importa nosso cliente Supabase
-import LoginPage from './pages/LoginPage.js';
-import ClientesPage from './pages/ClientesPage.js';
-import CobrancasPage from './pages/CobrancasPage.js';
-import SobrePage from './pages/SobrePage.js';
+import React from 'react';
 import './App.css';
 
 function App() {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [view, setView] = useState('clientes');
-    const [clienteParaCobranca, setClienteParaCobranca] = useState(null);
+  // Pega os valores das variáveis de ambiente
+  const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+  const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-    // Verifica a sessão do usuário quando o app carrega
-    useEffect(() => {
-        const getSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
-            setUser(session?.user ?? null);
-            setLoading(false);
-        };
-        getSession();
+  return (
+    <div className="App" style={{ padding: '20px', fontFamily: 'monospace', lineHeight: '1.6' }}>
+      <h1>Modo de Depuração de Variáveis de Ambiente</h1>
 
-        // Escuta por mudanças no estado de autenticação (login, logout)
-        const { data: authListener } = supabase.auth.onAuthStateChange(
-            (_event, session) => {
-                setUser(session?.user ?? null);
-            }
-        );
-        
-        // Limpa o listener quando o componente desmonta
-        return () => {
-            authListener.subscription.unsubscribe();
-        };
-    }, []);
-    
-    const handleLogout = async () => {
-        await supabase.auth.signOut();
-        setUser(null);
-    };
-    
-    // Se ainda estiver verificando a sessão, mostra uma tela de carregamento
-    if (loading) {
-        return <div className="App"><h1>Carregando...</h1></div>;
-    }
+      <div style={{ border: '2px solid #ccc', padding: '15px', marginTop: '20px' }}>
+        <h2>Verificando <code>process.env</code>:</h2>
 
-    // Se não houver usuário, mostra a página de login
-    if (!user) {
-        return <LoginPage supabase={supabase} onLogin={(user) => setUser(user)} />;
-    }
-
-    // Se houver um usuário, mostra o aplicativo principal
-    const handleLancarCobrancaParaCliente = (cliente) => {
-        setClienteParaCobranca(cliente);
-        setView('cobrancas');
-    };
-    const handleNavigate = (targetView) => {
-        setView(targetView);
-        setClienteParaCobranca(null);
-    }
-
-    return (
-        <div className="App">
-            <header className="main-header">
-                <nav className="main-nav">
-                    <button onClick={() => handleNavigate('clientes')} className={view === 'clientes' ? 'active' : ''}>Gerenciar Clientes</button>
-                    <button onClick={() => handleNavigate('cobrancas')} className={view === 'cobrancas' ? 'active' : ''}>Gerenciar Cobranças</button>
-                    <button onClick={() => handleNavigate('sobre')} className={view === 'sobre' ? 'active' : ''}>Sobre</button>
-                </nav>
-                <div className="user-info">
-                    <span>Olá, {user.email}</span>
-                    <button onClick={handleLogout} className="btn-logout">Sair</button>
-                </div>
-            </header>
-            <main>
-                {view === 'clientes' && <ClientesPage onLancarCobranca={handleLancarCobrancaParaCliente} />}
-                {view === 'cobrancas' && <CobrancasPage clientePreSelecionado={clienteParaCobranca} />}
-                {view === 'sobre' && <SobrePage />}
-            </main>
+        <div>
+          <strong>REACT_APP_SUPABASE_URL:</strong>
+          <pre style={{ background: '#f0f0f0', padding: '10px', borderRadius: '4px', color: supabaseUrl ? 'green' : 'red' }}>
+            {supabaseUrl || 'NÃO DEFINIDA OU VAZIA'}
+          </pre>
         </div>
-    );
+
+        <div style={{ marginTop: '20px' }}>
+          <strong>REACT_APP_SUPABASE_ANON_KEY:</strong>
+          <pre style={{ background: '#f0f0f0', padding: '10px', borderRadius: '4px', color: supabaseAnonKey ? 'green' : 'red' }}>
+            {supabaseAnonKey ? `DEFINIDA (comprimento: ${supabaseAnonKey.length})` : 'NÃO DEFINIDA OU VAZIA'}
+          </pre>
+          <small>(A chave não é mostrada por segurança, apenas sua presença e comprimento)</small>
+        </div>
+      </div>
+
+      <div style={{ marginTop: '30px' }}>
+        <h3>Instruções:</h3>
+        <ol>
+          <li>Se ambos os campos estiverem em <strong><span style={{ color: 'green' }}>VERDE</span></strong> e mostrando 'DEFINIDA', o problema está em outro lugar (provavelmente no `supabaseClient.js`).</li>
+          <li>Se um ou ambos os campos estiverem em <strong><span style={{ color: 'red' }}>VERMELHO</span></strong> e mostrando 'NÃO DEFINIDA', isso <strong>prova</strong> que a Render não está injetando as variáveis no processo de build.</li>
+          <li>Se esse for o caso, a causa é 100% um erro de digitação no nome da variável (Key) no dashboard da Render.</li>
+        </ol>
+      </div>
+    </div>
+  );
 }
 
 export default App;
