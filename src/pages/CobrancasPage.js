@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import CobrancaList from '../components/CobrancaList.js';
 import CobrancaForm from '../components/CobrancaForm.js';
 import ArquivosRemessa from '../components/ArquivosRemessa.js';
-import RetornoUploader from '../components/RetornoUploader.js'; // <-- Novo import
+import RetornoUploader from '../components/RetornoUploader.js';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -13,6 +13,7 @@ const API_COBRANCAS_URL = `${API_BASE_URL}/api/cobrancas`;
 const API_CONFIG_URL = `${API_BASE_URL}/api/config`;
 
 const CobrancasPage = ({ clientePreSelecionado }) => {
+  // --- ESTADOS DO COMPONENTE ---
   const [cobrancas, setCobrancas] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [config, setConfig] = useState(null);
@@ -22,11 +23,16 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCobrancas, setSelectedCobrancas] = useState(new Set());
 
+  // --- FUNÇÃO PARA BUSCAR DADOS INICIAIS ---
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const responses = await Promise.all([fetch(API_COBRANCAS_URL), fetch(API_CLIENTES_URL), fetch(API_CONFIG_URL)]);
-      for (const res of responses) { if (!res.ok) throw new Error(`Falha na API: ${res.url} respondeu com status ${res.status}`); }
+      const responses = await Promise.all([
+        fetch(API_COBRANCAS_URL), fetch(API_CLIENTES_URL), fetch(API_CONFIG_URL)
+      ]);
+      for (const res of responses) {
+        if (!res.ok) throw new Error(`Falha na API: ${res.url} respondeu com status ${res.status}`);
+      }
       const [cobrancasData, clientesData, configData] = await Promise.all(responses.map(r => r.json()));
       setCobrancas(Array.isArray(cobrancasData) ? cobrancasData : []);
       setClientes(Array.isArray(clientesData) ? clientesData : []);
@@ -34,13 +40,17 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
     } catch (error) {
       console.error("Erro ao buscar dados:", error);
       alert(`Não foi possível carregar os dados. Verifique se o servidor backend está rodando. Erro: ${error.message}`);
+      setCobrancas([]); setClientes([]); setConfig(null);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
+  // Efeito para abrir o formulário se um cliente foi pré-selecionado
   useEffect(() => {
     if (clientePreSelecionado) {
       setIsFormVisible(true);
@@ -48,6 +58,7 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
     }
   }, [clientePreSelecionado]);
 
+  // --- LÓGICA DE FILTRAGEM COM useMemo ---
   const cobrancasFiltradas = useMemo(() => {
     if (!Array.isArray(clientes) || !Array.isArray(cobrancas)) return [];
     return cobrancas.filter(c => {
@@ -59,6 +70,7 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
     });
   }, [cobrancas, clientes, filtro]);
 
+  // --- FUNÇÕES DE SELEÇÃO ---
   const handleSelectCobranca = (cobrancaId) => {
     setSelectedCobrancas(prev => {
       const newSelected = new Set(prev);
@@ -76,11 +88,57 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
     }
   };
 
-  const handleSave = async (cobranca) => { /* ... sua função handleSave completa ... */ };
-  const handleDelete = async (id) => { /* ... sua função handleDelete completa ... */ };
-  const handleEdit = (cobranca) => { /* ... sua função handleEdit completa ... */ };
+  // --- FUNÇÕES DE CRUD ---
+  const handleSave = async (cobranca) => {
+    if (!cobranca.clienteId) {
+      alert("ERRO: Por favor, selecione um cliente.");
+      return;
+    }
+    const method = cobranca.id ? 'PUT' : 'POST';
+    const url = cobranca.id ? `${API_COBRANCAS_URL}/${cobranca.id}` : API_COBRANCAS_URL;
 
-  // --- FUNÇÕES DE RELATÓRIO E REMESSA ---
+    const payload = { ...cobranca, clienteId: Number(cobranca.clienteId), valor: Number(cobranca.valor) };
+    if (!payload.statusRemessa) {
+      payload.statusRemessa = 'pendente';
+    }
+    if (!cobranca.id) {
+      delete payload.id;
+    }
+
+    try {
+      const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Falha ao salvar cobrança.');
+      }
+      fetchData();
+      setIsFormVisible(false);
+      setCobrancaAtual(null);
+    } catch (error) {
+      console.error("Erro ao salvar cobrança:", error);
+      alert(`Ocorreu um erro: ${error.message}`);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Tem certeza que deseja deletar esta cobrança?')) {
+      try {
+        const response = await fetch(`${API_COBRANCAS_URL}/${id}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Falha ao deletar cobrança.');
+        fetchData();
+      } catch (error) {
+        console.error("Erro ao deletar cobrança:", error);
+        alert(`Ocorreu um erro: ${error.message}`);
+      }
+    }
+  };
+
+  const handleEdit = (cobranca) => {
+    setCobrancaAtual(cobranca);
+    setIsFormVisible(true);
+  };
+
+  // --- FUNÇÕES DE GERAÇÃO DE RELATÓRIOS E REMESSA ---
   const gerarPDF = () => {
     const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
     if (cobrancasParaProcessar.length === 0) {
@@ -120,16 +178,16 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
     const confirmacao = window.confirm(
       `Será gerado um arquivo de remessa com ${cobrancasParaProcessar.length} cobrança(s).\n` +
       `Novo NSA: ${novoNsaSequencial}\n\n` +
-      `Após a geração, estas cobranças serão arquivadas e removidas da lista. Continuar?`
+      `Após a geração, estas cobranças serão arquivadas. Continuar?`
     );
     if (!confirmacao) return;
 
-    // --- Etapa 1: Geração do Arquivo .TXT ---
+    // Etapa 1: Geração do Arquivo .TXT
     try {
       const formatText = (text = '', length) => String(text).substring(0, length).padEnd(length, ' ');
       const formatNumber = (num = 0, length) => String(num).replace(/[^0-9]/g, '').padStart(length, '0');
       const layout = {
-        header: { TIPO_REGISTRO: 1, COD_SERVICO: 1, CONVENIO: 20, NOME_EMPRESA: 20, COD_BANCO: 3, NOME_BANCO: 20, DATA_GERACAO: 8, NSA: 8, VERSAO_LAYOUT: 59, ID_SISTEMA: 29 },
+        header: { TIPO_REGISTRO: 1, COD_SERVICO: 1, CONVENIO: 20, NOME_EMPRESA: 20, COD_BANCO: 3, NOME_BANCO: 20, DATA_GERACAO: 8, NSA: 8, VERSAO_LAYOUT: 40, ID_SISTEMA: 29 },
         detail: { TIPO_REGISTRO: 1, CODIGO_CLIENTE: 25, DADOS_BANCARIOS: 20, DATA_VENCIMENTO: 8, VALOR_DEBITO: 15, COD_MOEDA: 1, BRANCOS: 79, COD_OCORRENCIA: 1 },
         trailer: { TIPO_REGISTRO: 1, TOTAL_REGISTROS: 6, SOMA_VALORES: 18, BRANCOS: 125 }
       };
@@ -174,19 +232,17 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
       const blob = new Blob([finalContent], { type: 'text/plain;charset=latin1' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      // link.download = `REMESSA_NSA_${novoNsaSequencial}.txt`;
-      link.download = `REMESSA_NSA_${novoNsaSequencial}.rem`;
+      link.download = `REMESSA_NSA_${novoNsaSequencial}.txt`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
     } catch (error) {
       console.error("Erro na montagem do arquivo TXT:", error);
-      alert("Falha ao montar o arquivo de remessa. A operação foi cancelada e os dados NÃO foram arquivados.");
-      return; // Interrompe tudo se a geração do TXT falhar
+      alert("Falha ao montar o arquivo de remessa. A operação foi cancelada.");
+      return;
     }
 
-    // --- Etapa 2: Atualização do NSA e Arquivamento ---
+    // Etapa 2: Atualização do NSA e Arquivamento
     try {
       // Atualiza o NSA
       const updatedConfigPayload = { ...config, ultimoNsaSequencial: novoNsaSequencial };
@@ -208,14 +264,19 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
       alert(`Remessa (NSA ${novoNsaSequencial}) gerada e arquivada com sucesso!`);
       setSelectedCobrancas(new Set());
       fetchData();
-
     } catch (error) {
       console.error("Erro na etapa de pós-geração:", error);
       alert(`ERRO CRÍTICO: O arquivo TXT foi gerado, mas ocorreu um erro ao atualizar os dados no servidor (${error.message}). Anote o NSA ${novoNsaSequencial} e verifique os dados manualmente.`);
     }
   };
+
   if (isLoading) {
-    return <div className="App"><h1>Gerenciamento de Cobranças</h1><p>Carregando...</p></div>;
+    return (
+      <div className="App">
+        <h1>Gerenciamento de Cobranças</h1>
+        <p>Carregando dados do sistema...</p>
+      </div>
+    );
   }
 
   return (
@@ -223,7 +284,7 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
       <h1>Gerenciamento de Cobranças</h1>
       <div className="action-bar">
         <div className="search-bar">
-          <input type="text" id="filtro-cobranca" name="filtro-cobranca" placeholder="Filtrar por nome..." value={filtro} onChange={(e) => setFiltro(e.target.value)} />
+          <input type="text" id="filtro-cobranca" name="filtro-cobranca" placeholder="Filtrar por nome do cliente..." value={filtro} onChange={(e) => setFiltro(e.target.value)} />
         </div>
         <div className="button-group">
           {!isFormVisible && (<button onClick={() => { setIsFormVisible(true); setCobrancaAtual(null); }} className="btn-primary">Nova Cobrança</button>)}
