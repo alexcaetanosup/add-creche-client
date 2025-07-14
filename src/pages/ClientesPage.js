@@ -73,7 +73,8 @@ const ClientesPage = ({ onLancarCobranca }) => {
 
     return (
         <div>
-            <h1>Gerenciamento de Clientes</h1>
+            <h1>Aplicatico de Cobrança</h1>
+            <h2>Gerenciamento de Clientes</h2>
             <div className="action-bar">
                 <div className="search-bar">
                     <input

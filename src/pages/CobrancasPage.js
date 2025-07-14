@@ -273,7 +273,8 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
   if (isLoading) {
     return (
       <div className="App">
-        <h1>Gerenciamento de Cobranças</h1>
+        <h1>Aplicatico de Cobrança</h1>
+        <h2>Gerenciamento de Cobranças</h2>
         <p>Carregando dados do sistema...</p>
       </div>
     );
