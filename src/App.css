@@ -311,3 +311,42 @@ button {
 .btn-lancar-cobranca:hover {
   background-color: #e67e22;
 }
+
+/* Estilos para o uploader de retorno */
+.retorno-uploader-container {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f0f3f4;
+  border: 1px solid #d5dbdb;
+  border-radius: 8px;
+}
+
+.upload-controls {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.resultado-processamento {
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+
+.resultado-processamento.success {
+  background-color: #d4efdf;
+  border-color: #27ae60;
+  color: #145a32;
+}
+
+.resultado-processamento.error {
+  background-color: #f5b7b1;
+  border-color: #c0392b;
+  color: #78281f;
+}
+
+.resultado-processamento ul {
+  margin-top: 10px;
+  margin-bottom: 0;
+}
