@@ -419,3 +419,7 @@ button {
 .btn-logout:hover {
   background-color: #c0392b;
 }
+
+#ola {
+  text-transform: capitalize;
+}

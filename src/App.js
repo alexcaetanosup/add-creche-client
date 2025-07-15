@@ -79,7 +79,7 @@ function App() {
           <button onClick={() => handleNavigate('sobre')} className={view === 'sobre' ? 'active' : ''}>Sobre</button>
         </nav>
         <div className="user-info">
-          <span>Olá, {user.email}</span>
+          <span id='ola'>Olá, {user.email}</span>
           <button onClick={handleLogout} className="btn-logout">Sair</button>
         </div>
       </header>
