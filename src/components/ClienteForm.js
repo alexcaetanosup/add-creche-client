@@ -4,9 +4,10 @@ const ClienteForm = ({ onSave, clienteAtual, onCancel }) => {
     const [cliente, setCliente] = useState({
         nome: '',
         documento: '',
-        banco: '033',
+        banco: '',
         contaCorrente: '',
         ativo: true
+        // REMOVEMOS 'codigo' do estado inicial, pois será gerado pelo banco de dados.
     });
 
     useEffect(() => {
@@ -27,19 +28,35 @@ const ClienteForm = ({ onSave, clienteAtual, onCancel }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSave(cliente);
-        setCliente({ nome: '', documento: '', banco: '', contaCorrente: '', ativo: true });
+        // Removemos 'codigo' do objeto enviado se for um novo cliente, para que o Supabase o gere.
+        const clienteParaSalvar = { ...cliente };
+        if (!clienteAtual) {
+            delete clienteParaSalvar.codigo;
+        }
+        onSave(clienteParaSalvar);
     };
 
-    // Em ClienteForm.js
     return (
         <div className="form-container">
             <h2>{clienteAtual ? 'Editar Cliente' : 'Adicionar Novo Cliente'}</h2>
             <form onSubmit={handleSubmit}>
-                <div className="form-group">
-                    <label htmlFor="codigo">Código do Cliente (para remessa)</label>
-                    <input type="text" id="codigo" name="codigo" value={cliente.codigo || ''} onChange={handleChange} required />
-                </div>
+
+                {/* Exibe o Código apenas se estiver editando um cliente existente */}
+                {clienteAtual && (
+                    <div className="form-group">
+                        <label htmlFor="codigo">Código / Matrícula</label>
+                        <input
+                            type="text"
+                            id="codigo"
+                            name="codigo"
+                            value={cliente.codigo || ''}
+                            readOnly // Impede a edição, pois é gerado pelo banco
+                            disabled
+                            style={{ backgroundColor: '#f0f0f0' }}
+                        />
+                    </div>
+                )}
+
                 <div className="form-group">
                     <label htmlFor="nome">Nome</label>
                     <input type="text" id="nome" name="nome" value={cliente.nome} onChange={handleChange} required />
