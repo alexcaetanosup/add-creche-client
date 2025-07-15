@@ -58,13 +58,12 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
     }
   }, [clientePreSelecionado]);
 
-  // --- LÓGICA DE FILTRAGEM COM useMemo (CORRIGIDA) ---
+  // --- LÓGICA DE FILTRAGEM COM useMemo ---
   const cobrancasFiltradas = useMemo(() => {
-    if (!Array.isArray(clientes) || !Array.isArray(cobrancas)) {
-      return [];
-    }
+    if (!Array.isArray(clientes) || !Array.isArray(cobrancas)) return [];
     return cobrancas.filter(c => {
-      if (c.statusRemessa !== 'pendente') return false;
+      // A condição principal agora é: nsa_remessa deve ser nulo
+      if (c.nsa_remessa !== null) return false;
 
       const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
       if (!cliente) return false;
@@ -102,12 +101,11 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
     const url = cobranca.id ? `${API_COBRANCAS_URL}/${cobranca.id}` : API_COBRANCAS_URL;
 
     const payload = { ...cobranca, clienteId: Number(cobranca.clienteId), valor: Number(cobranca.valor) };
-    if (!payload.statusRemessa) {
-      payload.statusRemessa = 'pendente';
-    }
+    // Garante que o campo nsa_remessa seja nulo para novas cobranças
     if (!cobranca.id) {
-      delete payload.id;
+      payload.nsa_remessa = null;
     }
+    delete payload.id; // Remove o ID para POST, ou usa o ID já existente para PUT no payload
 
     try {
       const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -125,7 +123,7 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Tem certeza que deseja deletar esta cobrança?')) {
+    if (window.confirm('Tem certeza que deseja deletar esta cobrança permanentemente?')) {
       try {
         const response = await fetch(`${API_COBRANCAS_URL}/${id}`, { method: 'DELETE' });
         if (!response.ok) throw new Error('Falha ao deletar cobrança.');
@@ -142,7 +140,31 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
     setIsFormVisible(true);
   };
 
-  // --- FUNÇÃO UNIFICADA DE GERAÇÃO E ARQUIVAMENTO DE REMESSA ---
+  // --- FUNÇÕES DE GERAÇÃO DE RELATÓRIOS E REMESSA ---
+  const gerarPDF = () => {
+    const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
+    if (cobrancasParaProcessar.length === 0) {
+      alert("Nenhuma cobrança selecionada para gerar o PDF.");
+      return;
+    }
+    const doc = new jsPDF();
+    doc.text("Relatório de Cobranças Selecionadas", 14, 16);
+    autoTable(doc, {
+      head: [['Cliente', 'Descrição', 'Valor', 'Vencimento', 'Status']],
+      body: cobrancasParaProcessar.map(c => {
+        const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
+        return [
+          cliente ? cliente.nome : 'N/A',
+          c.descricao,
+          new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.valor),
+          new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR'),
+          c.status
+        ];
+      }), startY: 20,
+    });
+    doc.save('relatorio_cobrancas.pdf');
+  };
+
   const gerarTXT = async () => {
     const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
     if (cobrancasParaProcessar.length === 0) {
@@ -156,9 +178,9 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
 
     const novoNsaSequencial = config.ultimoNsaSequencial + 1;
     const confirmacao = window.confirm(
-      `Será gerado um arquivo de remessa com ${cobrancasParaProcessar.length} cobrança(s).\n` +
+      `Gerar remessa com ${cobrancasParaProcessar.length} cobrança(s)?\n` +
       `Novo NSA: ${novoNsaSequencial}\n\n` +
-      `Após a geração, estas cobranças serão arquivadas. Continuar?`
+      `Após a geração, estas cobranças serão marcadas como processadas.`
     );
     if (!confirmacao) return;
 
@@ -167,7 +189,7 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
       const formatText = (text = '', length) => String(text).substring(0, length).padEnd(length, ' ');
       const formatNumber = (num = 0, length) => String(num).replace(/[^0-9]/g, '').padStart(length, '0');
       const layout = {
-        header: { TIPO_REGISTRO: 1, COD_SERVICO: 1, CONVENIO: 20, NOME_EMPRESA: 20, COD_BANCO: 3, NOME_BANCO: 20, DATA_GERACAO: 8, NSA: 8, VERSAO_LAYOUT: 40, ID_SISTEMA: 29 },
+        header: { TIPO_REGISTRO: 1, COD_SERVICO: 1, CONVENIO: 20, NOME_EMPRESA: 20, COD_BANCO: 3, NOME_BANCO: 20, DATA_GERACAO: 8, NSA: 8, VERSAO_LAYOUT: 59, ID_SISTEMA: 29 },
         detail: { TIPO_REGISTRO: 1, CODIGO_CLIENTE: 25, DADOS_BANCARIOS: 20, DATA_VENCIMENTO: 8, VALOR_DEBITO: 15, COD_MOEDA: 1, BRANCOS: 79, COD_OCORRENCIA: 1 },
         trailer: { TIPO_REGISTRO: 1, TOTAL_REGISTROS: 6, SOMA_VALORES: 18, BRANCOS: 125 }
       };
@@ -223,56 +245,29 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
       return;
     }
 
-    // Etapa 2: Atualização do NSA e Arquivamento
+    // Etapa 2: Marcar cobranças e atualizar NSA
     try {
-      // Atualiza o NSA
+      const idsParaMarcar = cobrancasParaProcessar.map(c => c.id);
+      const marcarResponse = await fetch(`${API_BASE_URL}/api/marcar-remessa`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idsParaMarcar, nsaDaRemessa: novoNsaSequencial }),
+      });
+      if (!marcarResponse.ok) throw new Error('Falha ao marcar as cobranças como processadas.');
+
       const updatedConfigPayload = { ...config, ultimoNsaSequencial: novoNsaSequencial };
       const configUpdateUrl = `${API_CONFIG_URL}/${config.id}`;
       const updateNsaResponse = await fetch(configUpdateUrl, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedConfigPayload) });
       if (!updateNsaResponse.ok) throw new Error('Falha ao atualizar o NSA no servidor.');
 
-      // Arquiva a remessa
-      const hoje = new Date();
-      const mesAtual = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
-      const nomeArquivo = `${mesAtual.getFullYear()}_${String(mesAtual.getMonth() + 1).padStart(2, '0')}`;
-      const archiveResponse = await fetch(`${API_BASE_URL}/api/arquivar-remessa`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cobrancasParaArquivar: cobrancasParaProcessar, mesAno: nomeArquivo }),
-      });
-      if (!archiveResponse.ok) throw new Error('Falha ao arquivar a remessa no servidor.');
-
-      alert(`Remessa (NSA ${novoNsaSequencial}) gerada e arquivada com sucesso!`);
+      alert(`Remessa (NSA ${novoNsaSequencial}) gerada e cobranças marcadas com sucesso!`);
       setSelectedCobrancas(new Set());
       fetchData();
+
     } catch (error) {
       console.error("Erro na etapa de pós-geração:", error);
       alert(`ERRO CRÍTICO: O arquivo TXT foi gerado, mas ocorreu um erro ao atualizar os dados no servidor (${error.message}). Anote o NSA ${novoNsaSequencial} e verifique os dados manualmente.`);
     }
-  };
-
-  const gerarPDF = () => {
-    const cobrancasParaProcessar = cobrancas.filter(c => selectedCobrancas.has(c.id));
-    if (cobrancasParaProcessar.length === 0) {
-      alert("Nenhuma cobrança selecionada para gerar o PDF.");
-      return;
-    }
-    const doc = new jsPDF();
-    doc.text("Relatório de Cobranças Selecionadas", 14, 16);
-    autoTable(doc, {
-      head: [['Cliente', 'Descrição', 'Valor', 'Vencimento', 'Status']],
-      body: cobrancasParaProcessar.map(c => {
-        const cliente = clientes.find(cli => Number(cli.id) === Number(c.clienteId));
-        return [
-          cliente ? cliente.nome : 'N/A',
-          c.descricao,
-          new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(c.valor),
-          new Date(c.vencimento + 'T00:00:00').toLocaleDateString('pt-BR'),
-          c.status
-        ];
-      }), startY: 20,
-    });
-    doc.save('relatorio_cobrancas.pdf');
   };
 
   if (isLoading) {
@@ -294,7 +289,7 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
         <div className="button-group">
           {!isFormVisible && (<button onClick={() => { setIsFormVisible(true); setCobrancaAtual(null); }} className="btn-primary">Nova Cobrança</button>)}
           <button onClick={gerarPDF} className="btn-secondary">Gerar PDF</button>
-          <button onClick={gerarTXT} className="btn-tertiary">Gerar TXT e Arquivar</button>
+          <button onClick={gerarTXT} className="btn-tertiary">Gerar TXT e Marcar</button>
         </div>
       </div>
 
@@ -321,9 +316,7 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
 
       <hr style={{ margin: '40px 0' }} />
       <RetornoUploader apiBaseUrl={API_BASE_URL} onProcessado={fetchData} />
-
-      <hr style={{ margin: '40px 0' }} />
-      <ArquivosRemessa apiBaseUrl={API_BASE_URL} />
+      {/* O componente ArquivosRemessa foi removido pois o novo fluxo não precisa dele */}
     </div>
   );
 };
