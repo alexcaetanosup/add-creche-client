@@ -384,7 +384,8 @@ button {
   justify-content: space-between;
   align-items: center;
   padding: 10px 20px;
-  background-color: #34495e;
+  /* background-color: #34495e; */
+  background-color:  #3a5a7b;
   color: white;
   margin-bottom: 20px;
 }
