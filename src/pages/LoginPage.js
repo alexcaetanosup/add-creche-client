@@ -11,7 +11,6 @@ const LoginPage = ({ supabase, onLogin }) => {
         setLoading(true);
         setError('');
 
-        // Função de login do Supabase
         const { data, error } = await supabase.auth.signInWithPassword({
             email: email,
             password: password,
@@ -20,7 +19,9 @@ const LoginPage = ({ supabase, onLogin }) => {
         if (error) {
             setError(error.message);
         } else if (data.user) {
-            onLogin(data.user); // Chama a função do App.js para avisar que o login foi bem-sucedido
+            // A prop 'onLogin' não existe mais no App.js atual,
+            // pois o listener de autenticação cuida disso automaticamente.
+            // Podemos remover a chamada para onLogin.
         }
         setLoading(false);
     };
@@ -33,23 +34,11 @@ const LoginPage = ({ supabase, onLogin }) => {
                 <form onSubmit={handleLogin}>
                     <div className="form-group">
                         <label htmlFor="email">E-mail</label>
-                        <input
-                            type="email"
-                            id="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
+                        <input type="email" id="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
                     </div>
                     <div className="form-group">
                         <label htmlFor="password">Senha</label>
-                        <input
-                            type="password"
-                            id="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
+                        <input type="password" id="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
                     </div>
                     {error && <p className="error-message">{error}</p>}
                     <button type="submit" className="btn-primary" disabled={loading}>
