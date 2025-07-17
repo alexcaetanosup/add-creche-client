@@ -386,7 +386,7 @@ button {
   align-items: center;
   padding: 10px 20px;
   /* background-color: #34495e; */
-  background-color:  #3a5a7b;
+  background-color: #3a5a7b;
   color: white;
   margin-bottom: 20px;
 }
@@ -426,9 +426,103 @@ button {
   text-transform: capitalize;
 }
 
-@media screen and (max-width: 900px) {
-  .topnav a {
-    float: none;
+/* =============================================== */
+/* --- CSS RESPONSIVO PARA DISPOSITIVOS MÓVEIS --- */
+/* =============================================== */
+
+@media (max-width: 768px) {
+
+  /* Reduz o padding geral do corpo e do app */
+  body {
+    padding: 10px;
+  }
+
+  .App {
+    padding: 15px;
+  }
+
+  /* --- Barra de Ações (Filtro e Botões) --- */
+  .action-bar {
+    flex-direction: column;
+    /* Empilha os itens verticalmente */
+    align-items: stretch;
+    /* Faz os itens ocuparem a largura total */
+    gap: 15px;
+  }
+
+  .search-bar {
+    margin-right: 0;
+  }
+
+  .button-group {
+    flex-direction: column;
+    /* Empilha os botões */
     width: 100%;
+  }
+
+  .button-group button {
+    width: 100%;
+    /* Botões ocupam toda a largura */
+  }
+
+  /* --- Tabelas --- */
+  .cobrancas-table {
+    display: block;
+    /* Permite scroll horizontal */
+    overflow-x: auto;
+    /* Adiciona a barra de rolagem horizontal */
+    white-space: nowrap;
+    /* Impede que o texto quebre linha dentro das células */
+    -webkit-overflow-scrolling: touch;
+    /* Melhora a rolagem em iOS */
+  }
+
+  .cobrancas-table th,
+  .cobrancas-table td {
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  .cobrancas-table .action-buttons {
+    white-space: normal;
+    /* Permite que os botões quebrem linha se necessário */
+    min-width: 180px;
+    /* Garante espaço para os botões de ação */
+  }
+
+  /* --- Formulários --- */
+  .form-container {
+    padding: 15px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions button {
+    width: 100%;
+  }
+
+  /* --- Navegação Principal --- */
+  .main-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .main-nav {
+    order: 2;
+    /* Move a navegação para baixo do user-info */
+  }
+
+  .user-info {
+    order: 1;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* --- Uploader de Arquivos --- */
+  .upload-controls {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
