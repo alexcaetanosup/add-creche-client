@@ -1,3 +1,5 @@
+/* eslint-disable no-restricted-globals */
+
 // Este código é fornecido pelo Create React App para um PWA básico.
 
 import { clientsClaim } from 'workbox-core';
