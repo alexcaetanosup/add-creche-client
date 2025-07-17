@@ -234,13 +234,13 @@ const CobrancasPage = ({ clientePreSelecionado }) => {
       const blob = new Blob([finalContent], { type: 'text/plain;charset=latin1' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `REMESSA_NSA_${novoNsaSequencial}.txt`;
+      link.download = `REMESSA_NSA_${novoNsaSequencial}.REM`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
     } catch (error) {
-      console.error("Erro na montagem do arquivo TXT:", error);
+      console.error("Erro na montagem do arquivo REM:", error);
       alert("Falha ao montar o arquivo de remessa. A operação foi cancelada.");
       return;
     }

@@ -1,4 +1,5 @@
 body {
+  /* display: flex; */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   background-color: #f4f7f6;
   margin: 0;
@@ -423,4 +424,11 @@ button {
 
 #ola {
   text-transform: capitalize;
+}
+
+@media screen and (max-width: 900px) {
+  .topnav a {
+    float: none;
+    width: 100%;
+  }
 }
