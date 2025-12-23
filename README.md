@@ -62,7 +62,7 @@ Para rodar este projeto localmente, você precisará ter o [Node.js](https://nod
     ```bash
     npm start
     ```
-    O aplicativo abrirá em `http://localhost:3000`.
+    O aplicativo abrirá em `http://localhost:`.
 
 ## 📦 Deploy
 
