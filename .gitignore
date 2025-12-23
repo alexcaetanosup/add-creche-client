@@ -4,6 +4,7 @@
 /node_modules
 /.pnp
 .pnp.js
+__pycache__/
 
 # testing
 /coverage
@@ -38,3 +39,7 @@ db.json
 # Meu arquivo de ambiente de desenvolvimento local
 .env.development
 .env
+
+# Ignorar arquivos de log
+*.log
+
